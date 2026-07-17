@@ -1,6 +1,6 @@
 # Zalando Middleware Orchestrator - User Guide
 
-Welcome to the Zalando Middleware Pipeline! This system is designed to seamlessly ingest, validate, and recover raw vendor data (like the Myntra Kaggle dataset) and transform it into a perfectly mapped "Golden Payload" that matches Zalando's strict schema requirements.
+Welcome to the Zalando Middleware Pipeline! This system is an enterprise-grade integration designed to extract data from a Microsoft AdventureWorks database, validate it against Zalando's strict OpenAPI schema, and transmit it seamlessly to Zalando's REST APIs.
 
 ---
 
@@ -8,65 +8,51 @@ Welcome to the Zalando Middleware Pipeline! This system is designed to seamlessl
 
 ### Prerequisites
 - Node.js (v22+)
-- Access to the raw data files in `data/raw/`
+- Docker and Docker Compose
 
-### Launching the Orchestrator
-To start the visual GUI Orchestrator, run the following command from the root directory:
+### Initializing the Infrastructure
+The pipeline relies on a local Docker stack to mock Zalando's infrastructure:
+1. **Stoplight Prism**: Serves as a live mock for the Zalando REST API.
+2. **Zalando Zally**: Mathematically verifies that our API schemas do not violate Zalando routing or property-naming rules.
+
+To boot the infrastructure:
 ```bash
-npx tsx src/server/gui-server.ts
+docker-compose up -d
 ```
-Then, open your browser and navigate to `http://localhost:4050`.
+
+### Environment Configuration
+Ensure you have a `.env` file located in the root directory. The application enforces a strict "Fail-Fast" startup if any of these are missing:
+```env
+PRISM_URL=http://127.0.0.1:4010
+CLIENT_ID=mock_client_id
+CLIENT_SECRET=mock_client_secret
+```
 
 ---
 
-## 2. The Pipeline Funnel
+## 2. System Architecture
 
-The Zalando pipeline is a strict funnel designed to reject ambiguous data rather than corrupting the final payload. Records flow through three stages:
+The project is being constructed across a 5-Epic roadmap. Currently, the foundational layers are active:
 
-1. **Extraction (Main)**: Parses raw data and extracts Zalando-required attributes (Colors, Silhouette, Size Grids). Items that lack a color or recognizable size are sent to the Dead Letter Queue (`onboarding_failures.json`).
-2. **Failure Recovery**: Scans the Dead Letter Queue and attempts to salvage items using Bucket A (Marketing Colors mapping) and Bucket B (Assortment Normalization).
-3. **Re-Ingestion**: Feeds the salvaged items back through the strict Extraction script. If they still fail, they are permanently rejected.
+### Epic 1: Contract Baseline
+The API contract (`specs/openapi.yaml`) defines exactly how our AdventureWorks products are modeled (via `ArticleModel` and `ArticleConfig`). 
+- **Validation**: Run `npm run lint:api` to send the schema to Zally. It will ensure that all properties (such as our newly added `base_color` and `media` elements) strictly conform to Zalando's `ASCII snake_case` rules.
 
----
+### Epic 2: The Transmission Core
+All outbound HTTP traffic routes through a centralized configuration to prevent "magic string" bugs.
+- **AuthManager**: Operates the OAuth2 Client Credentials flow, targeting the `/tokens` endpoint for the `article.write` scope. Includes a 60-second preemptive token refresh cache.
+- **ZalandoClient**: A dedicated Axios instance armed with exponential backoff retries to automatically navigate `429 Too Many Requests` or `5xx Server Errors`.
+- **Validation**: Run `npx tsx src/scripts/test-auth.ts` to test the runtime integration against the Prism mock server.
 
-## 3. Using the GUI Orchestrator
-
-The Orchestrator provides a premium glassmorphism interface to control the data flow.
-
-### Manual Operations
-You can run the pipeline sequentially if you need to debug specific logs:
-- **1. Process Extraction**: Selects a raw file (e.g., `Myntra Fashion Clothing.csv`) and performs the initial ingestion.
-- **2. Failure Recovery**: Selects the resulting `onboarding_failures.json` and runs the cleanup script.
-- **3. Process Recovered Records**: Re-ingests `Myntra_Recovered.csv`.
-
-### Full Automation (Recommended)
-For day-to-day operations, use the **Run End-to-End Pipeline** button. This automatically:
-1. Orchestrates all three steps securely on the backend.
-2. Aggregates the mathematical totals for a perfect accounting lifecycle.
-3. Populates the **Pipeline Funnel Dashboard** so you can view your Final Golden Payload and Unrecoverable counts at a glance.
+### Epic 3: Database Extraction (Upcoming)
+*(This architecture is currently under development)*
+The upcoming Epic 3 will establish the extraction layer connecting directly to the Microsoft AdventureWorks SQL instance.
+- Expected behavior includes pulling live SQL rows, cleaning them against our data dictionary, and feeding them into the strict `ArticleModel` payloads. Items that lack critical Zalando attributes will be directed to a Dead Letter Queue to prevent pipeline pollution.
 
 ---
 
-## 4. Understanding Output Artifacts
+## 3. Extensibility & Maintenance
 
-The pipeline generates several artifacts that you can view directly from the GUI:
-
-- **Clean Articles JSON (`data/processed/clean-articles.json`)**: This is the final Golden Payload. It contains only perfectly mapped configs and models ready for Zalando.
-- **Dead Letter Queue (`data/logs/onboarding_failures.json`)**: The intermediate queue containing records that failed the initial extraction, along with detailed failure reasons (e.g., "Color extraction failed").
-- **Dubious For Review (`data/logs/dubious_for_review.json`)**: Records that passed extraction but relied on a compromise rule (loose fallback, multipack override, size-grid default, misspelling correction) or contain "plus size" in the description. These are still present in the Clean Articles output but are flagged here for manual spot-checking by a Data Operator.
-- **Vendor Rejections (`data/logs/vendor_rejections.csv`)**: Hard rejections that could not be salvaged even after the recovery process. These must be returned to the vendor.
-
-### Important: Multi-Color `supplierColor` Values
-When reviewing `dubious_for_review.json`, you may see records with `reason_flagged: "multi_color_override"` and a `supplier_color` like `"navy white"`. This means the pipeline detected **two or more** colours in the description and correctly routed the item to the Zalando `multi` bucket (code `999`).
-
-**Do not assume the number of colours shown in `supplier_color` is the total count.** The pipeline currently captures only the first two colour tokens it finds. The garment may have additional colours. Refer to the `raw_description` field in the same record for the full, unmodified description text. See [docs/color-limitations.md](file:///c:/Github/Zalando-dev/zaland-middleware-mock/docs/color-limitations.md) for the full technical explanation.
-
----
-
-## 5. Extensibility (Adding New Mappings)
-
-If you notice a high rejection rate for a specific attribute, you can expand the dictionaries:
-- **Marketing Colors**: Add new color aliases (e.g., `mosstone,olive green`) to `data/mappings/marketing_colors.csv`.
-- **Regex Patterns**: Add new multipack or patterned logic directly to `src/mappings/color-extractor.ts`.
-
-> **Note**: The pipeline is strictly unit-tested using Node's Native Test Runner. Run `npx tsx --test test/*.test.ts` to verify the mapping algorithms before deploying changes!
+The pipeline is built for extensibility:
+- **Updating the Schema**: If Zalando updates their REST requirements, modify `specs/openapi.yaml`. You **must** run `npm run lint:api` afterward. If Zally rejects it, the CI pipeline will fail.
+- **Updating Routes**: All routing logic is strictly centralized in `src/config/api.ts`. Do not use hardcoded string literals inside API services.

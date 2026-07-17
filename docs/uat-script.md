@@ -1,86 +1,62 @@
 # User Acceptance Testing (UAT) Script
 
-**Project**: Zalando Middleware Mock Orchestrator
-**Objective**: To verify that the Data Pipeline Funnel correctly extracts, recovers, and rejects vendor data according to Zalando's schema requirements.
-**Tester Role**: Data Operations Manager / QA Analyst
+**Project**: Zalando Middleware AdventureWorks Orchestrator
+**Objective**: To verify that the Integration Pipeline securely connects the Microsoft AdventureWorks database to the Zalando API while mathematically enforcing schema contracts.
+**Tester Role**: Integration Engineer / QA Analyst
 
 ---
 
 ## Pre-Requisites
 1. Node.js v22+ is installed on the testing machine.
-2. The orchestrator server is running: `npx tsx src/server/gui-server.ts`.
-3. The browser is open to `http://localhost:4050`.
+2. The Docker stack (Zally, Postgres, and Prism) is running (`docker-compose up -d`).
+3. `.env` is correctly configured with `PRISM_URL`, `CLIENT_ID`, and `CLIENT_SECRET`.
 
 ---
 
-## Test Scenario 1: End-to-End Orchestration & Funnel Mathematics
+## Test Scenario 1: Zally Gate Contract Verification (Epic 1)
 
-**Description**: Verify that the automated pipeline securely routes records without mathematical discrepancies.
+**Description**: Verify that the local OpenAPI schema strictly adheres to Zalando's property naming rules (e.g., ASCII snake_case) and accurately validates our extensions (`base_color`, `media`).
 
 **Steps**:
-1. In the Orchestrator GUI, locate the **Pipeline Funnel Dashboard** section.
-2. Observe that all metrics initially read `--` or `0`.
-3. In the "4. Full Automation" panel, click the **Run End-to-End Pipeline** button.
-4. Watch the "Execution Logs" terminal.
+1. Open a terminal in the root of the project.
+2. Run the linting verification script: `npm run lint:api`.
+3. Wait for the Zally Docker container to process the schemas.
 
 **Expected Results**:
-- [ ] The terminal prints `Attempted to re-ingest 284 recovered items.`
-- [ ] The terminal prints `25 were successfully salvaged.`
-- [ ] The terminal prints `259 remained un-salvageable...`
-- [ ] The Funnel Dashboard updates with **Total Raw Records: 526,564**.
-- [ ] The Funnel Dashboard updates with **Final Golden Payload: 524,646**.
-- [ ] The Funnel Dashboard updates with **Total Unrecoverable: 1,918**.
+- [ ] The terminal prints `Results for openapi.yaml: MUST Violations found: 0`.
+- [ ] The terminal prints `Results for openapi-known-bad.yaml: MUST Violations found: 1`.
+- [ ] The terminal prints `✅ GATE VERIFIED: The Zally linter is active and correctly enforcing rules.`
 
 ---
 
-## Test Scenario 2: Golden Payload Schema Validation
+## Test Scenario 2: Transmission Core Authentication (Epic 2)
 
-**Description**: Verify that the successfully extracted items conform to Zalando's Model/Config/Simple architecture.
+**Description**: Verify that the `AuthManager` correctly targets the `/tokens` mock endpoint, requests the `article.write` scope, and successfully retrieves an OAuth2 token from the Prism server using an Anti-Magic-String architecture.
 
 **Steps**:
-1. Click the **📄 View JSON** link under the "Final Golden Payload" metric in the Dashboard.
-2. Open `data/processed/clean-articles.json`.
-3. Inspect a random `ArticleModel` entry.
+1. Open a terminal in the root of the project.
+2. Execute the integration test: `npx tsx src/scripts/test-auth.ts`.
+3. Ensure Prism is running locally on port 4010.
 
 **Expected Results**:
-- [ ] The entry contains a `model_sku`, `brand_code`, and `silhouette_id`.
-- [ ] The `configs` array exists and contains at least one `ArticleConfig`.
-- [ ] The `ArticleConfig` contains a `color_code` and `supplier_color`.
-- [ ] The `simples` array exists and contains items mapped to a `size_grid_id` (e.g., `206`, `205`, `onesize_grid`).
+- [ ] The terminal prints `Testing AuthManager and Prism integration...`.
+- [ ] The terminal prints `✅ 200 OK: Successfully retrieved token from Prism mock server.`
+- [ ] A mock token payload is successfully captured and displayed.
 
 ---
 
-## Test Scenario 3: Dead Letter Queue (Unrecoverable Rejections)
+## Test Scenario 3: AdventureWorks SQL Extraction (Epic 3 - Placeholder)
 
-**Description**: Verify that items lacking a determinable color or size are correctly rejected to prevent polluting the Zalando pipeline.
+**Description**: Verify that the application successfully connects to the Microsoft AdventureWorks database and correctly maps raw product records into intermediate Zalando taxonomy models.
 
-**Steps**:
-1. Click the **📄 View Rejections** link under the "Total Unrecoverable" metric.
-2. Open `data/logs/vendor_rejections.csv`.
-3. Locate the item with product ID `9338305` ("scorpious women pack of shrug top").
+**Steps**: *(To be finalized during Epic 3)*
+1. Boot the AdventureWorks SQL Server container.
+2. Run the `test-db-extraction.ts` script.
 
-**Expected Results**:
-- [ ] The item exists in the rejections CSV.
-- [ ] The reason column states: `Hard Rejection: Missing mandatory color/pattern attribute`.
-- [ ] The item does NOT exist in the final `clean-articles.json`.
-
----
-
-## Test Scenario 4: Bucket A Extensibility (Marketing Colors)
-
-**Description**: Verify that the fallback mapping for obscure marketing colors correctly salvages items.
-
-**Steps**:
-1. Open `data/mappings/marketing_colors.csv` and add a new row: `space dust,grey`.
-2. Open `data/raw/Myntra Fashion Clothing.csv` and intentionally add a dummy row at the end:
-   `9999999,DummyBrand,tshirts,"men space dust cotton tshirt",,`
-3. Return to the GUI Orchestrator and click **Run End-to-End Pipeline**.
-4. Check `data/processed/clean-articles.json` for `9999999`.
-
-**Expected Results**:
-- [ ] The dummy item was successfully extracted into the Golden Payload.
-- [ ] The `color_code` for the item was mapped as `grey` during the recovery phase.
-- [ ] The Total Raw Records metric in the UI increased by 1.
+**Expected Results**: *(Subject to change)*
+- [ ] Database connection establishes successfully without magic strings.
+- [ ] Product rows are queried and mapped to `ArticleModel` components.
+- [ ] Discrepancies or un-mappable items are routed to a local Dead Letter Queue.
 
 ---
 
