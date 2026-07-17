@@ -4,7 +4,7 @@ import { ZALANDO_API } from '../config/api';
 import { AuthManager } from './AuthManager';
 
 export const ZalandoClient = axios.create({
-  baseURL: ZALANDO_API.BASE_URL
+  baseURL: `${ZALANDO_API.BASE_URL}${ZALANDO_API.ENDPOINTS.ARTICLES}`
 });
 
 // Implement axios-retry logic for 429s and 5xx errors with exponential backoff
