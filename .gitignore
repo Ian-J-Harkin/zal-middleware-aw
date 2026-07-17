@@ -1,0 +1,22 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+
+# Ignore raw kaggle datasets
+data/raw/
+
+# Ignore generated massive JSON files and logs
+data/processed/clean-articles.json
+data/logs/onboarding_failures.json
+data/logs/dubious_for_review.json
+data/logs/vendor_rejections.csv
+
+# Environment and system files
+.env
+.DS_Store
+*.log
+
+# Editor / IDE
+.vscode/
+.idea/
