@@ -162,6 +162,27 @@ components:
         supplier_color:
           type: string
           description: The raw extracted supplier color
+        media:
+          type: array
+          description: "List of media assets for this color variant."
+          items:
+            type: object
+            required:
+              - url
+              - media_sort_key
+              - media_category
+            properties:
+              url:
+                type: string
+                format: uri
+                description: "[MOCK EXEMPTION] Must be a valid URI. Production requires publicly accessible HTTPS. Local mock environment permits http://localhost:9000 MinIO references."
+              media_sort_key:
+                type: integer
+                description: "1 is the primary image, subsequent numbers dictate gallery order."
+              media_category:
+                type: string
+                enum: [ "Image", "Video", "Thumbnail" ]
+                description: "Zalando media type. Note: Every Image requires an accompanying Thumbnail with the same sort key."
         simples:
           type: array
           minItems: 1

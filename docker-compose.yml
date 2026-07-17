@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  prism:
+    image: stoplight/prism:5
+    command: mock -h 0.0.0.0 -p 4010 /specs/openapi.yaml
+    volumes:
+      - ./specs:/specs
+    ports:
+      - "4010:4010"
+
+  zally-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: zally
+      POSTGRES_USER: zally
+      POSTGRES_PASSWORD: zally_password
+    ports:
+      - "5432:5432"
+
+  zally:
+    image: zally-server:latest
+    ports:
+      - "8000:8000"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://zally-db:5432/zally
+      SPRING_DATASOURCE_USERNAME: zally
+      SPRING_DATASOURCE_PASSWORD: zally_password
+    depends_on:
+      - zally-db
