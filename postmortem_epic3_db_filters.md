@@ -101,7 +101,7 @@ Products with Models AND Real Images: 157
 * **Stage 3 (Photo Filter):** 138 products were found to only possess `no_image_available.gif` photos and were successfully dropped, leaving a final payload of **157 sellable products**.
 
 ### Sample Payload
-A JSON serialization of one of the 157 validated records, confirming the relational joins succeeded and real image files are present:
+A JSON serialization of one of the 157 validated records, confirming the relational joins succeeded, real image files are present, and whitespace padding has been stripped:
 
 ```json
 {
@@ -120,9 +120,9 @@ A JSON serialization of one of the 157 validated records, confirming the relatio
   "WeightUnitMeasureCode": null,
   "Weight": null,
   "DaysToManufacture": 0,
-  "ProductLine": "S ",
+  "ProductLine": "S",
   "Class": null,
-  "Style": "U ",
+  "Style": "U",
   "ProductSubcategoryID": 21,
   "ProductModelID": 11,
   "SellStartDate": "2011-05-31T00:00:00.000Z",
@@ -158,16 +158,75 @@ A JSON serialization of one of the 157 validated records, confirming the relatio
 ```
 
 ## 6. Structural Gaps & Robustness Improvements
-Following a critical review of the initial successful extraction, several structural gaps were identified and closed to ensure the pipeline adheres strictly to our Epic 1 data discipline:
+Following a critical review of the initial successful extraction, several structural gaps were identified and closed to ensure the pipeline adheres strictly to our Epic 1 data discipline.
 
 ### A. The "Mislabeled Metric" Correction
 Our original reporting grouped intermediate steps under the final count, which masked the exact impact of the photo filter. By explicitly breaking down the logging across the three distinct constraints (Total -> Model Exclusions -> Photo Exclusions), we eliminated false confidence and secured an accurate view of the data payload.
 
+Furthermore, we verified the console arithmetic directly against the physical JSON files written to disk:
+- `logs/exclusions_no_model.json` array length: **209**
+- `logs/exclusions_placeholder_only.json` array length: **138**
+- `logs/success_sellable_products.json` array length: **157**
+
 ### B. The Placeholder Assumption Audit
-To confirm `no_image_available.gif` was indeed the *only* generic placeholder in the 20-year-old database, a distinct filename audit was run against the remaining valid entries. The script verified exactly 100 unique, legitimate descriptor filenames (e.g., `awc_jersey_female_small.gif`), proving no hidden placeholders like `default.jpg` or `coming_soon.gif` slipped through the net.
+To confirm `no_image_available.gif` was indeed the *only* generic placeholder in the 20-year-old database, a distinct filename audit was run globally against `Production.ProductPhoto` (not joined, to ensure we didn't miss placeholders attached only to manufacturing parts). 
+
+The script verified exactly 100 unique, legitimate descriptor filenames, proving no hidden placeholders like `default.jpg` or `coming_soon.gif` slipped through the net:
+```text
+awc_jersey_female_small.gif, awc_jersey_male_small.gif, awc_tee_female_small.gif, awc_tee_male_small.gif, awc_tee_male_yellow_small.gif, bike_lock_small.gif, bike_shoes_small.gif, bike_shorts_female_small.gif, bike_shorts_male_small.gif, bikepump_small.gif, chain_lube_small.gif, chain_small.gif, clipless_pedals_small.gif, co2_4tire_small.gif, double_headlight_small.gif, fork_small.gif, frame_black_small.gif, frame_blue_small.gif, frame_red_small.gif, frame_silver_small.gif, frame_small.gif, frame_yellow_small.gif, handlebar_small.gif, handpump_small.gif, hotrodbike_black_small.gif, hotrodbike_blue_small.gif, hotrodbike_f_silver_small.gif, hotrodbike_f_small.gif, hotrodbike_red_small.gif, hotrodbike_silver_small.gif, hotrodbike_small.gif, hotrodbike_yellow_small.gif, innertube_small.gif, julianax_r_02_black_small.gif, julianax_r_02_blue_small.gif, julianax_r_02_f_black_small.gif, julianax_r_02_f_blue_small.gif, julianax_r_02_f_gold_small.gif, julianax_r_02_f_green_small.gif, julianax_r_02_f_red_small.gif, julianax_r_02_gold_small.gif, julianax_r_02_green_small.gif, julianax_r_02_red_small.gif, julianax_r_02_silver_small.gif, julianax_r_02_yellow_small.gif, mb_shoes_small.gif, mb_tires_small.gif, pedal_small.gif, racer_black_small.gif, racer_blue_small.gif, racer_red_small.gif, racer_silver_small.gif, racer_yellow_small.gif, racer02_black_f_small.gif, racer02_black_small.gif, racer02_blue_f_small.gif, racer02_blue_small.gif, racer02_green_f_small.gif, racer02_green_small.gif, racer02_red_small.gif, racer02_silver_small.gif, racer02_yellow_f_small.gif, roadster_black_small.gif, roadster_blue_small.gif, roadster_green_f_small.gif, roadster_green_small.gif, roadster_purple_f_small.gif, roadster_purple_small.gif, roadster_red_f_small.gif, roadster_red_small.gif, roadster_silver_small.gif, roadster_small.gif, roadster_yellow_f_small.gif, roadster_yellow_small.gif, saddle_small.gif, shorts_female_small.gif, shorts_male_small.gif, silver_chain_small.gif, silver_pedal_small.gif, silver_sprocket_small.gif, single_headlight_small.gif, sprocket_small.gif, street_tires_small.gif, superlight_black_f_small.gif, superlight_black_small.gif, superlight_blue_f_small.gif, superlight_blue_small.gif, superlight_metalicgreen_f_small.gif, superlight_metalicgreen_small.gif, superlight_red_f_small.gif, superlight_red_small.gif, superlight_silver_f_small.gif, superlight_silver_small.gif, superlight_yellow_f_small.gif, superlight_yellow_small.gif, tail_lights_small.gif, tirepatch_kit_small.gif, water_bottle_cage_small.gif, water_bottle_small.gif, wheel_small.gif
+```
 
 ### C. The Whitespace Timebomb (NCHAR Sanitization)
 AdventureWorks utilizes fixed-length `NCHAR`/`CHAR` columns, padding values with trailing spaces (e.g., `"Style": "U "`). To prevent these artifacts from silently breaking string-mapping routines in Epic 4 (e.g., `'U ' !== 'U'`), a recursive `sanitizeData` utility was integrated to aggressively trim all string properties before final export.
+
+```typescript
+function sanitizeData<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Buffer.isBuffer(obj) || obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeData) as any;
+
+  const trimmedObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string') {
+      trimmedObj[key] = value.trim(); // Blanket trim execution
+    } else if (typeof value === 'object') {
+      trimmedObj[key] = sanitizeData(value);
+    } else {
+      trimmedObj[key] = value;
+    }
+  }
+  return trimmedObj as T;
+}
+```
+**Note on Filenames**: This utility intentionally strips whitespace from all strings, including filenames (`ThumbnailPhotoFileName`, `LargePhotoFileName`). This was a deliberate choice to preemptively sanitize the data graph before feeding it to modern URLs or S3 validation in downstream systems.
+
+**Safety Audit:** To verify the blanket trim does not destroy meaningfully space-sensitive strings (like multi-word `Name` fields), we ran a script comparing the raw dataset to the sanitized dataset, aggregating every single field mutation. The output proved the trim is entirely safe and only affects `NCHAR`/`CHAR` columns padded by SQL Server:
+
+```console
+Field: ProductLine (4 unique changes)
+  'S ' -> 'S'
+  'M ' -> 'M'
+  'R ' -> 'R'
+  'T ' -> 'T'
+
+Field: Style (3 unique changes)
+  'U ' -> 'U'
+  'W ' -> 'W'
+  'M ' -> 'M'
+
+Field: SizeUnitMeasureCode (1 unique changes)
+  'CM ' -> 'CM'
+
+Field: WeightUnitMeasureCode (2 unique changes)
+  'LB ' -> 'LB'
+  'G  ' -> 'G'
+
+Field: Class (3 unique changes)
+  'H ' -> 'H'
+  'M ' -> 'M'
+  'L ' -> 'L'
+```
+As shown, fields like `Name`, `Color`, and `ThumbnailPhotoFileName` were not mutated at all, as they are `NVARCHAR` columns without padding.
 
 ### D. Reinstating the Three-Tier Audit Trail
 The most critical structural gap was dropping 347 non-compliant rows into the void without logging *why* they failed. The verification script was updated to actively query and persist the exact excluded items to disk, recreating the three-tier discipline established in Epic 1:
