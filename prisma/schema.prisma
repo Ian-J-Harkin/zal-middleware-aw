@@ -1,0 +1,1100 @@
+generator client {
+  provider        = "prisma-client-js"
+  engineType      = "library"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+  schemas  = ["HumanResources", "Person", "Production", "Purchasing", "Sales", "dbo"]
+}
+
+model Address {
+  AddressID                                                  Int                       @id(map: "PK_Address_AddressID") @default(autoincrement())
+  AddressLine1                                               String                    @db.NVarChar(60)
+  AddressLine2                                               String?                   @db.NVarChar(60)
+  City                                                       String                    @db.NVarChar(30)
+  StateProvinceID                                            Int
+  PostalCode                                                 String                    @db.NVarChar(15)
+  SpatialLocation                                            Unsupported("geography")?
+  rowguid                                                    String                    @unique(map: "AK_Address_rowguid") @default(dbgenerated("newid()"), map: "DF_Address_rowguid") @db.UniqueIdentifier
+  ModifiedDate                                               DateTime                  @default(now(), map: "DF_Address_ModifiedDate") @db.DateTime
+  StateProvince                                              StateProvince             @relation(fields: [StateProvinceID], references: [StateProvinceID], onUpdate: NoAction, map: "FK_Address_StateProvince_StateProvinceID")
+  BusinessEntityAddress                                      BusinessEntityAddress[]
+  SalesOrderHeader_SalesOrderHeader_BillToAddressIDToAddress SalesOrderHeader[]        @relation("SalesOrderHeader_BillToAddressIDToAddress")
+  SalesOrderHeader_SalesOrderHeader_ShipToAddressIDToAddress SalesOrderHeader[]        @relation("SalesOrderHeader_ShipToAddressIDToAddress")
+
+  @@unique([AddressLine1, AddressLine2, City, StateProvinceID, PostalCode], map: "IX_Address_AddressLine1_AddressLine2_City_StateProvinceID_PostalCode")
+  @@index([StateProvinceID], map: "IX_Address_StateProvinceID")
+  @@schema("Person")
+}
+
+model AddressType {
+  AddressTypeID         Int                     @id(map: "PK_AddressType_AddressTypeID") @default(autoincrement())
+  Name                  String                  @unique(map: "AK_AddressType_Name") @db.NVarChar(50)
+  rowguid               String                  @unique(map: "AK_AddressType_rowguid") @default(dbgenerated("newid()"), map: "DF_AddressType_rowguid") @db.UniqueIdentifier
+  ModifiedDate          DateTime                @default(now(), map: "DF_AddressType_ModifiedDate") @db.DateTime
+  BusinessEntityAddress BusinessEntityAddress[]
+
+  @@schema("Person")
+}
+
+model AWBuildVersion {
+  SystemInformationID Int      @id(map: "PK_AWBuildVersion_SystemInformationID") @default(autoincrement()) @db.TinyInt
+  Database_Version    String   @map("Database Version") @db.NVarChar(25)
+  VersionDate         DateTime @db.DateTime
+  ModifiedDate        DateTime @default(now(), map: "DF_AWBuildVersion_ModifiedDate") @db.DateTime
+
+  @@schema("dbo")
+}
+
+model BillOfMaterials {
+  BillOfMaterialsID                                  Int         @id(clustered: false, map: "PK_BillOfMaterials_BillOfMaterialsID") @default(autoincrement())
+  ProductAssemblyID                                  Int?
+  ComponentID                                        Int
+  StartDate                                          DateTime    @default(now(), map: "DF_BillOfMaterials_StartDate") @db.DateTime
+  EndDate                                            DateTime?   @db.DateTime
+  UnitMeasureCode                                    String      @db.NChar(3)
+  BOMLevel                                           Int         @db.SmallInt
+  PerAssemblyQty                                     Decimal     @default(1.00, map: "DF_BillOfMaterials_PerAssemblyQty") @db.Decimal(8, 2)
+  ModifiedDate                                       DateTime    @default(now(), map: "DF_BillOfMaterials_ModifiedDate") @db.DateTime
+  Product_BillOfMaterials_ComponentIDToProduct       Product     @relation("BillOfMaterials_ComponentIDToProduct", fields: [ComponentID], references: [ProductID], onUpdate: NoAction, map: "FK_BillOfMaterials_Product_ComponentID")
+  Product_BillOfMaterials_ProductAssemblyIDToProduct Product?    @relation("BillOfMaterials_ProductAssemblyIDToProduct", fields: [ProductAssemblyID], references: [ProductID], onDelete: NoAction, onUpdate: NoAction, map: "FK_BillOfMaterials_Product_ProductAssemblyID")
+  UnitMeasure                                        UnitMeasure @relation(fields: [UnitMeasureCode], references: [UnitMeasureCode], onUpdate: NoAction, map: "FK_BillOfMaterials_UnitMeasure_UnitMeasureCode")
+
+  @@unique([ProductAssemblyID, ComponentID, StartDate], map: "AK_BillOfMaterials_ProductAssemblyID_ComponentID_StartDate", clustered: true)
+  @@index([UnitMeasureCode], map: "IX_BillOfMaterials_UnitMeasureCode")
+  @@schema("Production")
+}
+
+model BusinessEntity {
+  BusinessEntityID      Int                     @id(map: "PK_BusinessEntity_BusinessEntityID") @default(autoincrement())
+  rowguid               String                  @unique(map: "AK_BusinessEntity_rowguid") @default(dbgenerated("newid()"), map: "DF_BusinessEntity_rowguid") @db.UniqueIdentifier
+  ModifiedDate          DateTime                @default(now(), map: "DF_BusinessEntity_ModifiedDate") @db.DateTime
+  BusinessEntityAddress BusinessEntityAddress[]
+  BusinessEntityContact BusinessEntityContact[]
+  Person                Person?
+  Store                 Store?
+  Vendor                Vendor?
+
+  @@schema("Person")
+}
+
+model BusinessEntityAddress {
+  BusinessEntityID Int
+  AddressID        Int
+  AddressTypeID    Int
+  rowguid          String         @unique(map: "AK_BusinessEntityAddress_rowguid") @default(dbgenerated("newid()"), map: "DF_BusinessEntityAddress_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime       @default(now(), map: "DF_BusinessEntityAddress_ModifiedDate") @db.DateTime
+  Address          Address        @relation(fields: [AddressID], references: [AddressID], onUpdate: NoAction, map: "FK_BusinessEntityAddress_Address_AddressID")
+  AddressType      AddressType    @relation(fields: [AddressTypeID], references: [AddressTypeID], onUpdate: NoAction, map: "FK_BusinessEntityAddress_AddressType_AddressTypeID")
+  BusinessEntity   BusinessEntity @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_BusinessEntityAddress_BusinessEntity_BusinessEntityID")
+
+  @@id([BusinessEntityID, AddressID, AddressTypeID], map: "PK_BusinessEntityAddress_BusinessEntityID_AddressID_AddressTypeID")
+  @@index([AddressID], map: "IX_BusinessEntityAddress_AddressID")
+  @@index([AddressTypeID], map: "IX_BusinessEntityAddress_AddressTypeID")
+  @@schema("Person")
+}
+
+model BusinessEntityContact {
+  BusinessEntityID Int
+  PersonID         Int
+  ContactTypeID    Int
+  rowguid          String         @unique(map: "AK_BusinessEntityContact_rowguid") @default(dbgenerated("newid()"), map: "DF_BusinessEntityContact_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime       @default(now(), map: "DF_BusinessEntityContact_ModifiedDate") @db.DateTime
+  BusinessEntity   BusinessEntity @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_BusinessEntityContact_BusinessEntity_BusinessEntityID")
+  ContactType      ContactType    @relation(fields: [ContactTypeID], references: [ContactTypeID], onUpdate: NoAction, map: "FK_BusinessEntityContact_ContactType_ContactTypeID")
+  Person           Person         @relation(fields: [PersonID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_BusinessEntityContact_Person_PersonID")
+
+  @@id([BusinessEntityID, PersonID, ContactTypeID], map: "PK_BusinessEntityContact_BusinessEntityID_PersonID_ContactTypeID")
+  @@index([ContactTypeID], map: "IX_BusinessEntityContact_ContactTypeID")
+  @@index([PersonID], map: "IX_BusinessEntityContact_PersonID")
+  @@schema("Person")
+}
+
+model ContactType {
+  ContactTypeID         Int                     @id(map: "PK_ContactType_ContactTypeID") @default(autoincrement())
+  Name                  String                  @unique(map: "AK_ContactType_Name") @db.NVarChar(50)
+  ModifiedDate          DateTime                @default(now(), map: "DF_ContactType_ModifiedDate") @db.DateTime
+  BusinessEntityContact BusinessEntityContact[]
+
+  @@schema("Person")
+}
+
+model CountryRegion {
+  CountryRegionCode     String                  @id(map: "PK_CountryRegion_CountryRegionCode") @db.NVarChar(3)
+  Name                  String                  @unique(map: "AK_CountryRegion_Name") @db.NVarChar(50)
+  ModifiedDate          DateTime                @default(now(), map: "DF_CountryRegion_ModifiedDate") @db.DateTime
+  CountryRegionCurrency CountryRegionCurrency[]
+  SalesTerritory        SalesTerritory[]
+  StateProvince         StateProvince[]
+
+  @@schema("Person")
+}
+
+model CountryRegionCurrency {
+  CountryRegionCode String        @db.NVarChar(3)
+  CurrencyCode      String        @db.NChar(3)
+  ModifiedDate      DateTime      @default(now(), map: "DF_CountryRegionCurrency_ModifiedDate") @db.DateTime
+  CountryRegion     CountryRegion @relation(fields: [CountryRegionCode], references: [CountryRegionCode], onUpdate: NoAction, map: "FK_CountryRegionCurrency_CountryRegion_CountryRegionCode")
+  Currency          Currency      @relation(fields: [CurrencyCode], references: [CurrencyCode], onUpdate: NoAction, map: "FK_CountryRegionCurrency_Currency_CurrencyCode")
+
+  @@id([CountryRegionCode, CurrencyCode], map: "PK_CountryRegionCurrency_CountryRegionCode_CurrencyCode")
+  @@index([CurrencyCode], map: "IX_CountryRegionCurrency_CurrencyCode")
+  @@schema("Sales")
+}
+
+model CreditCard {
+  CreditCardID     Int                @id(map: "PK_CreditCard_CreditCardID") @default(autoincrement())
+  CardType         String             @db.NVarChar(50)
+  CardNumber       String             @unique(map: "AK_CreditCard_CardNumber") @db.NVarChar(25)
+  ExpMonth         Int                @db.TinyInt
+  ExpYear          Int                @db.SmallInt
+  ModifiedDate     DateTime           @default(now(), map: "DF_CreditCard_ModifiedDate") @db.DateTime
+  PersonCreditCard PersonCreditCard[]
+  SalesOrderHeader SalesOrderHeader[]
+
+  @@schema("Sales")
+}
+
+model Culture {
+  CultureID                             String                                  @id(map: "PK_Culture_CultureID") @db.NChar(6)
+  Name                                  String                                  @unique(map: "AK_Culture_Name") @db.NVarChar(50)
+  ModifiedDate                          DateTime                                @default(now(), map: "DF_Culture_ModifiedDate") @db.DateTime
+  ProductModelProductDescriptionCulture ProductModelProductDescriptionCulture[]
+
+  @@schema("Production")
+}
+
+model Currency {
+  CurrencyCode                                         String                  @id(map: "PK_Currency_CurrencyCode") @db.NChar(3)
+  Name                                                 String                  @unique(map: "AK_Currency_Name") @db.NVarChar(50)
+  ModifiedDate                                         DateTime                @default(now(), map: "DF_Currency_ModifiedDate") @db.DateTime
+  CountryRegionCurrency                                CountryRegionCurrency[]
+  CurrencyRate_CurrencyRate_FromCurrencyCodeToCurrency CurrencyRate[]          @relation("CurrencyRate_FromCurrencyCodeToCurrency")
+  CurrencyRate_CurrencyRate_ToCurrencyCodeToCurrency   CurrencyRate[]          @relation("CurrencyRate_ToCurrencyCodeToCurrency")
+
+  @@schema("Sales")
+}
+
+model CurrencyRate {
+  CurrencyRateID                                   Int                @id(map: "PK_CurrencyRate_CurrencyRateID") @default(autoincrement())
+  CurrencyRateDate                                 DateTime           @db.DateTime
+  FromCurrencyCode                                 String             @db.NChar(3)
+  ToCurrencyCode                                   String             @db.NChar(3)
+  AverageRate                                      Float              @db.Money
+  EndOfDayRate                                     Float              @db.Money
+  ModifiedDate                                     DateTime           @default(now(), map: "DF_CurrencyRate_ModifiedDate") @db.DateTime
+  Currency_CurrencyRate_FromCurrencyCodeToCurrency Currency           @relation("CurrencyRate_FromCurrencyCodeToCurrency", fields: [FromCurrencyCode], references: [CurrencyCode], onUpdate: NoAction, map: "FK_CurrencyRate_Currency_FromCurrencyCode")
+  Currency_CurrencyRate_ToCurrencyCodeToCurrency   Currency           @relation("CurrencyRate_ToCurrencyCodeToCurrency", fields: [ToCurrencyCode], references: [CurrencyCode], onUpdate: NoAction, map: "FK_CurrencyRate_Currency_ToCurrencyCode")
+  SalesOrderHeader                                 SalesOrderHeader[]
+
+  @@unique([CurrencyRateDate, FromCurrencyCode, ToCurrencyCode], map: "AK_CurrencyRate_CurrencyRateDate_FromCurrencyCode_ToCurrencyCode")
+  @@schema("Sales")
+}
+
+model Customer {
+  CustomerID       Int                @id(map: "PK_Customer_CustomerID") @default(autoincrement())
+  PersonID         Int?
+  StoreID          Int?
+  TerritoryID      Int?
+  AccountNumber    String             @unique(map: "AK_Customer_AccountNumber") @db.VarChar(10)
+  rowguid          String             @unique(map: "AK_Customer_rowguid") @default(dbgenerated("newid()"), map: "DF_Customer_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime           @default(now(), map: "DF_Customer_ModifiedDate") @db.DateTime
+  Person           Person?            @relation(fields: [PersonID], references: [BusinessEntityID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Customer_Person_PersonID")
+  SalesTerritory   SalesTerritory?    @relation(fields: [TerritoryID], references: [TerritoryID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Customer_SalesTerritory_TerritoryID")
+  Store            Store?             @relation(fields: [StoreID], references: [BusinessEntityID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Customer_Store_StoreID")
+  SalesOrderHeader SalesOrderHeader[]
+
+  @@index([TerritoryID], map: "IX_Customer_TerritoryID")
+  @@schema("Sales")
+}
+
+model DatabaseLog {
+  DatabaseLogID Int      @id(clustered: false, map: "PK_DatabaseLog_DatabaseLogID") @default(autoincrement())
+  PostTime      DateTime @db.DateTime
+  DatabaseUser  String   @db.NVarChar(128)
+  Event         String   @db.NVarChar(128)
+  Schema        String?  @db.NVarChar(128)
+  Object        String?  @db.NVarChar(128)
+  TSQL          String   @db.NVarChar(Max)
+  XmlEvent      String   @db.Xml
+
+  @@schema("dbo")
+}
+
+model Department {
+  DepartmentID              Int                         @id(map: "PK_Department_DepartmentID") @default(autoincrement()) @db.SmallInt
+  Name                      String                      @unique(map: "AK_Department_Name") @db.NVarChar(50)
+  GroupName                 String                      @db.NVarChar(50)
+  ModifiedDate              DateTime                    @default(now(), map: "DF_Department_ModifiedDate") @db.DateTime
+  EmployeeDepartmentHistory EmployeeDepartmentHistory[]
+
+  @@schema("HumanResources")
+}
+
+model Document {
+  DocumentNode    Unsupported("hierarchyid") @id(map: "PK_Document_DocumentNode")
+  DocumentLevel   Int?                       @db.SmallInt
+  Title           String                     @db.NVarChar(50)
+  Owner           Int
+  FolderFlag      Boolean                    @default(false, map: "DF_Document_FolderFlag")
+  FileName        String                     @db.NVarChar(400)
+  FileExtension   String                     @db.NVarChar(8)
+  Revision        String                     @db.NChar(5)
+  ChangeNumber    Int                        @default(0, map: "DF_Document_ChangeNumber")
+  Status          Int                        @db.TinyInt
+  DocumentSummary String?                    @db.NVarChar(Max)
+  Document        Bytes?
+  rowguid         String                     @unique(map: "AK_Document_rowguid") @default(dbgenerated("newid()"), map: "DF_Document_rowguid") @db.UniqueIdentifier
+  ModifiedDate    DateTime                   @default(now(), map: "DF_Document_ModifiedDate") @db.DateTime
+  Employee        Employee                   @relation(fields: [Owner], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Document_Employee_Owner")
+  ProductDocument ProductDocument[]          @ignore
+
+  @@unique([DocumentLevel, DocumentNode], map: "AK_Document_DocumentLevel_DocumentNode")
+  @@index([FileName, Revision], map: "IX_Document_FileName_Revision")
+  @@schema("Production")
+}
+
+model EmailAddress {
+  BusinessEntityID Int
+  EmailAddressID   Int      @default(autoincrement())
+  EmailAddress     String?  @db.NVarChar(50)
+  rowguid          String   @default(dbgenerated("newid()"), map: "DF_EmailAddress_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime @default(now(), map: "DF_EmailAddress_ModifiedDate") @db.DateTime
+  Person           Person   @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_EmailAddress_Person_BusinessEntityID")
+
+  @@id([BusinessEntityID, EmailAddressID], map: "PK_EmailAddress_BusinessEntityID_EmailAddressID")
+  @@index([EmailAddress], map: "IX_EmailAddress_EmailAddress")
+  @@schema("Person")
+}
+
+model Employee {
+  BusinessEntityID          Int                         @id(map: "PK_Employee_BusinessEntityID")
+  NationalIDNumber          String                      @unique(map: "AK_Employee_NationalIDNumber") @db.NVarChar(15)
+  LoginID                   String                      @unique(map: "AK_Employee_LoginID") @db.NVarChar(256)
+  OrganizationNode          Unsupported("hierarchyid")?
+  OrganizationLevel         Int?                        @db.SmallInt
+  JobTitle                  String                      @db.NVarChar(50)
+  BirthDate                 DateTime                    @db.Date
+  MaritalStatus             String                      @db.NChar(1)
+  Gender                    String                      @db.NChar(1)
+  HireDate                  DateTime                    @db.Date
+  SalariedFlag              Boolean                     @default(true, map: "DF_Employee_SalariedFlag")
+  VacationHours             Int                         @default(0, map: "DF_Employee_VacationHours") @db.SmallInt
+  SickLeaveHours            Int                         @default(0, map: "DF_Employee_SickLeaveHours") @db.SmallInt
+  CurrentFlag               Boolean                     @default(true, map: "DF_Employee_CurrentFlag")
+  rowguid                   String                      @unique(map: "AK_Employee_rowguid") @default(dbgenerated("newid()"), map: "DF_Employee_rowguid") @db.UniqueIdentifier
+  ModifiedDate              DateTime                    @default(now(), map: "DF_Employee_ModifiedDate") @db.DateTime
+  Document                  Document[]
+  Person                    Person                      @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Employee_Person_BusinessEntityID")
+  EmployeeDepartmentHistory EmployeeDepartmentHistory[]
+  EmployeePayHistory        EmployeePayHistory[]
+  JobCandidate              JobCandidate[]
+  PurchaseOrderHeader       PurchaseOrderHeader[]
+  SalesPerson               SalesPerson?
+
+  @@index([OrganizationLevel, OrganizationNode], map: "IX_Employee_OrganizationLevel_OrganizationNode")
+  @@index([OrganizationNode], map: "IX_Employee_OrganizationNode")
+  @@schema("HumanResources")
+}
+
+model EmployeeDepartmentHistory {
+  BusinessEntityID Int
+  DepartmentID     Int        @db.SmallInt
+  ShiftID          Int        @db.TinyInt
+  StartDate        DateTime   @db.Date
+  EndDate          DateTime?  @db.Date
+  ModifiedDate     DateTime   @default(now(), map: "DF_EmployeeDepartmentHistory_ModifiedDate") @db.DateTime
+  Department       Department @relation(fields: [DepartmentID], references: [DepartmentID], onUpdate: NoAction, map: "FK_EmployeeDepartmentHistory_Department_DepartmentID")
+  Employee         Employee   @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_EmployeeDepartmentHistory_Employee_BusinessEntityID")
+  Shift            Shift      @relation(fields: [ShiftID], references: [ShiftID], onUpdate: NoAction, map: "FK_EmployeeDepartmentHistory_Shift_ShiftID")
+
+  @@id([BusinessEntityID, StartDate, DepartmentID, ShiftID], map: "PK_EmployeeDepartmentHistory_BusinessEntityID_StartDate_DepartmentID")
+  @@index([DepartmentID], map: "IX_EmployeeDepartmentHistory_DepartmentID")
+  @@index([ShiftID], map: "IX_EmployeeDepartmentHistory_ShiftID")
+  @@schema("HumanResources")
+}
+
+model EmployeePayHistory {
+  BusinessEntityID Int
+  RateChangeDate   DateTime @db.DateTime
+  Rate             Float    @db.Money
+  PayFrequency     Int      @db.TinyInt
+  ModifiedDate     DateTime @default(now(), map: "DF_EmployeePayHistory_ModifiedDate") @db.DateTime
+  Employee         Employee @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_EmployeePayHistory_Employee_BusinessEntityID")
+
+  @@id([BusinessEntityID, RateChangeDate], map: "PK_EmployeePayHistory_BusinessEntityID_RateChangeDate")
+  @@schema("HumanResources")
+}
+
+model ErrorLog {
+  ErrorLogID     Int      @id(map: "PK_ErrorLog_ErrorLogID") @default(autoincrement())
+  ErrorTime      DateTime @default(now(), map: "DF_ErrorLog_ErrorTime") @db.DateTime
+  UserName       String   @db.NVarChar(128)
+  ErrorNumber    Int
+  ErrorSeverity  Int?
+  ErrorState     Int?
+  ErrorProcedure String?  @db.NVarChar(126)
+  ErrorLine      Int?
+  ErrorMessage   String   @db.NVarChar(4000)
+
+  @@schema("dbo")
+}
+
+model Illustration {
+  IllustrationID           Int                        @id(map: "PK_Illustration_IllustrationID") @default(autoincrement())
+  Diagram                  String?                    @db.Xml
+  ModifiedDate             DateTime                   @default(now(), map: "DF_Illustration_ModifiedDate") @db.DateTime
+  ProductModelIllustration ProductModelIllustration[]
+
+  @@schema("Production")
+}
+
+model JobCandidate {
+  JobCandidateID   Int       @id(map: "PK_JobCandidate_JobCandidateID") @default(autoincrement())
+  BusinessEntityID Int?
+  Resume           String?   @db.Xml
+  ModifiedDate     DateTime  @default(now(), map: "DF_JobCandidate_ModifiedDate") @db.DateTime
+  Employee         Employee? @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onDelete: NoAction, onUpdate: NoAction, map: "FK_JobCandidate_Employee_BusinessEntityID")
+
+  @@index([BusinessEntityID], map: "IX_JobCandidate_BusinessEntityID")
+  @@schema("HumanResources")
+}
+
+model Location {
+  LocationID       Int                @id(map: "PK_Location_LocationID") @default(autoincrement()) @db.SmallInt
+  Name             String             @unique(map: "AK_Location_Name") @db.NVarChar(50)
+  CostRate         Float              @default(0.00, map: "DF_Location_CostRate") @db.SmallMoney
+  Availability     Decimal            @default(0.00, map: "DF_Location_Availability") @db.Decimal(8, 2)
+  ModifiedDate     DateTime           @default(now(), map: "DF_Location_ModifiedDate") @db.DateTime
+  ProductInventory ProductInventory[]
+  WorkOrderRouting WorkOrderRouting[]
+
+  @@schema("Production")
+}
+
+model Password {
+  BusinessEntityID Int      @id(map: "PK_Password_BusinessEntityID")
+  PasswordHash     String   @db.VarChar(128)
+  PasswordSalt     String   @db.VarChar(10)
+  rowguid          String   @default(dbgenerated("newid()"), map: "DF_Password_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime @default(now(), map: "DF_Password_ModifiedDate") @db.DateTime
+  Person           Person   @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Password_Person_BusinessEntityID")
+
+  @@schema("Person")
+}
+
+model Person {
+  BusinessEntityID      Int                     @id(map: "PK_Person_BusinessEntityID")
+  PersonType            String                  @db.NChar(2)
+  NameStyle             Boolean                 @default(false, map: "DF_Person_NameStyle")
+  Title                 String?                 @db.NVarChar(8)
+  FirstName             String                  @db.NVarChar(50)
+  MiddleName            String?                 @db.NVarChar(50)
+  LastName              String                  @db.NVarChar(50)
+  Suffix                String?                 @db.NVarChar(10)
+  EmailPromotion        Int                     @default(0, map: "DF_Person_EmailPromotion")
+  AdditionalContactInfo String?                 @db.Xml
+  Demographics          String?                 @db.Xml
+  rowguid               String                  @unique(map: "AK_Person_rowguid") @default(dbgenerated("newid()"), map: "DF_Person_rowguid") @db.UniqueIdentifier
+  ModifiedDate          DateTime                @default(now(), map: "DF_Person_ModifiedDate") @db.DateTime
+  BusinessEntityContact BusinessEntityContact[]
+  Customer              Customer[]
+  EmailAddress          EmailAddress[]
+  Employee              Employee?
+  Password              Password?
+  BusinessEntity        BusinessEntity          @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Person_BusinessEntity_BusinessEntityID")
+  PersonCreditCard      PersonCreditCard[]
+  PersonPhone           PersonPhone[]
+
+  @@index([LastName, FirstName, MiddleName], map: "IX_Person_LastName_FirstName_MiddleName")
+  @@schema("Person")
+}
+
+model PersonCreditCard {
+  BusinessEntityID Int
+  CreditCardID     Int
+  ModifiedDate     DateTime   @default(now(), map: "DF_PersonCreditCard_ModifiedDate") @db.DateTime
+  CreditCard       CreditCard @relation(fields: [CreditCardID], references: [CreditCardID], onUpdate: NoAction, map: "FK_PersonCreditCard_CreditCard_CreditCardID")
+  Person           Person     @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_PersonCreditCard_Person_BusinessEntityID")
+
+  @@id([BusinessEntityID, CreditCardID], map: "PK_PersonCreditCard_BusinessEntityID_CreditCardID")
+  @@schema("Sales")
+}
+
+model PersonPhone {
+  BusinessEntityID  Int
+  PhoneNumber       String          @db.NVarChar(25)
+  PhoneNumberTypeID Int
+  ModifiedDate      DateTime        @default(now(), map: "DF_PersonPhone_ModifiedDate") @db.DateTime
+  Person            Person          @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_PersonPhone_Person_BusinessEntityID")
+  PhoneNumberType   PhoneNumberType @relation(fields: [PhoneNumberTypeID], references: [PhoneNumberTypeID], onUpdate: NoAction, map: "FK_PersonPhone_PhoneNumberType_PhoneNumberTypeID")
+
+  @@id([BusinessEntityID, PhoneNumber, PhoneNumberTypeID], map: "PK_PersonPhone_BusinessEntityID_PhoneNumber_PhoneNumberTypeID")
+  @@index([PhoneNumber], map: "IX_PersonPhone_PhoneNumber")
+  @@schema("Person")
+}
+
+model PhoneNumberType {
+  PhoneNumberTypeID Int           @id(map: "PK_PhoneNumberType_PhoneNumberTypeID") @default(autoincrement())
+  Name              String        @db.NVarChar(50)
+  ModifiedDate      DateTime      @default(now(), map: "DF_PhoneNumberType_ModifiedDate") @db.DateTime
+  PersonPhone       PersonPhone[]
+
+  @@schema("Person")
+}
+
+model Product {
+  ProductID                                                  Int                       @id(map: "PK_Product_ProductID") @default(autoincrement())
+  Name                                                       String                    @unique(map: "AK_Product_Name") @db.NVarChar(50)
+  ProductNumber                                              String                    @unique(map: "AK_Product_ProductNumber") @db.NVarChar(25)
+  MakeFlag                                                   Boolean                   @default(true, map: "DF_Product_MakeFlag")
+  FinishedGoodsFlag                                          Boolean                   @default(true, map: "DF_Product_FinishedGoodsFlag")
+  Color                                                      String?                   @db.NVarChar(15)
+  SafetyStockLevel                                           Int                       @db.SmallInt
+  ReorderPoint                                               Int                       @db.SmallInt
+  StandardCost                                               Float                     @db.Money
+  ListPrice                                                  Float                     @db.Money
+  Size                                                       String?                   @db.NVarChar(5)
+  SizeUnitMeasureCode                                        String?                   @db.NChar(3)
+  WeightUnitMeasureCode                                      String?                   @db.NChar(3)
+  Weight                                                     Decimal?                  @db.Decimal(8, 2)
+  DaysToManufacture                                          Int
+  ProductLine                                                String?                   @db.NChar(2)
+  Class                                                      String?                   @db.NChar(2)
+  Style                                                      String?                   @db.NChar(2)
+  ProductSubcategoryID                                       Int?
+  ProductModelID                                             Int?
+  SellStartDate                                              DateTime                  @db.DateTime
+  SellEndDate                                                DateTime?                 @db.DateTime
+  DiscontinuedDate                                           DateTime?                 @db.DateTime
+  rowguid                                                    String                    @unique(map: "AK_Product_rowguid") @default(dbgenerated("newid()"), map: "DF_Product_rowguid") @db.UniqueIdentifier
+  ModifiedDate                                               DateTime                  @default(now(), map: "DF_Product_ModifiedDate") @db.DateTime
+  BillOfMaterials_BillOfMaterials_ComponentIDToProduct       BillOfMaterials[]         @relation("BillOfMaterials_ComponentIDToProduct")
+  BillOfMaterials_BillOfMaterials_ProductAssemblyIDToProduct BillOfMaterials[]         @relation("BillOfMaterials_ProductAssemblyIDToProduct")
+  ProductModel                                               ProductModel?             @relation(fields: [ProductModelID], references: [ProductModelID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Product_ProductModel_ProductModelID")
+  ProductSubcategory                                         ProductSubcategory?       @relation(fields: [ProductSubcategoryID], references: [ProductSubcategoryID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Product_ProductSubcategory_ProductSubcategoryID")
+  UnitMeasure_Product_SizeUnitMeasureCodeToUnitMeasure       UnitMeasure?              @relation("Product_SizeUnitMeasureCodeToUnitMeasure", fields: [SizeUnitMeasureCode], references: [UnitMeasureCode], onDelete: NoAction, onUpdate: NoAction, map: "FK_Product_UnitMeasure_SizeUnitMeasureCode")
+  UnitMeasure_Product_WeightUnitMeasureCodeToUnitMeasure     UnitMeasure?              @relation("Product_WeightUnitMeasureCodeToUnitMeasure", fields: [WeightUnitMeasureCode], references: [UnitMeasureCode], onDelete: NoAction, onUpdate: NoAction, map: "FK_Product_UnitMeasure_WeightUnitMeasureCode")
+  ProductCostHistory                                         ProductCostHistory[]
+  ProductDocument                                            ProductDocument[]         @ignore
+  ProductInventory                                           ProductInventory[]
+  ProductListPriceHistory                                    ProductListPriceHistory[]
+  ProductProductPhoto                                        ProductProductPhoto[]
+  ProductReview                                              ProductReview[]
+  ProductVendor                                              ProductVendor[]
+  PurchaseOrderDetail                                        PurchaseOrderDetail[]
+  ShoppingCartItem                                           ShoppingCartItem[]
+  SpecialOfferProduct                                        SpecialOfferProduct[]
+  TransactionHistory                                         TransactionHistory[]
+  WorkOrder                                                  WorkOrder[]
+
+  @@schema("Production")
+}
+
+model ProductCategory {
+  ProductCategoryID  Int                  @id(map: "PK_ProductCategory_ProductCategoryID") @default(autoincrement())
+  Name               String               @unique(map: "AK_ProductCategory_Name") @db.NVarChar(50)
+  rowguid            String               @unique(map: "AK_ProductCategory_rowguid") @default(dbgenerated("newid()"), map: "DF_ProductCategory_rowguid") @db.UniqueIdentifier
+  ModifiedDate       DateTime             @default(now(), map: "DF_ProductCategory_ModifiedDate") @db.DateTime
+  ProductSubcategory ProductSubcategory[]
+
+  @@schema("Production")
+}
+
+model ProductCostHistory {
+  ProductID    Int
+  StartDate    DateTime  @db.DateTime
+  EndDate      DateTime? @db.DateTime
+  StandardCost Float     @db.Money
+  ModifiedDate DateTime  @default(now(), map: "DF_ProductCostHistory_ModifiedDate") @db.DateTime
+  Product      Product   @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductCostHistory_Product_ProductID")
+
+  @@id([ProductID, StartDate], map: "PK_ProductCostHistory_ProductID_StartDate")
+  @@schema("Production")
+}
+
+model ProductDescription {
+  ProductDescriptionID                  Int                                     @id(map: "PK_ProductDescription_ProductDescriptionID") @default(autoincrement())
+  Description                           String                                  @db.NVarChar(400)
+  rowguid                               String                                  @unique(map: "AK_ProductDescription_rowguid") @default(dbgenerated("newid()"), map: "DF_ProductDescription_rowguid") @db.UniqueIdentifier
+  ModifiedDate                          DateTime                                @default(now(), map: "DF_ProductDescription_ModifiedDate") @db.DateTime
+  ProductModelProductDescriptionCulture ProductModelProductDescriptionCulture[]
+
+  @@schema("Production")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model ProductDocument {
+  ProductID    Int
+  DocumentNode Unsupported("hierarchyid")
+  ModifiedDate DateTime                   @default(now(), map: "DF_ProductDocument_ModifiedDate") @db.DateTime
+  Document     Document                   @relation(fields: [DocumentNode], references: [DocumentNode], onUpdate: NoAction, map: "FK_ProductDocument_Document_DocumentNode")
+  Product      Product                    @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductDocument_Product_ProductID")
+
+  @@id([ProductID, DocumentNode], map: "PK_ProductDocument_ProductID_DocumentNode")
+  @@ignore
+  @@schema("Production")
+}
+
+model ProductInventory {
+  ProductID    Int
+  LocationID   Int      @db.SmallInt
+  Shelf        String   @db.NVarChar(10)
+  Bin          Int      @db.TinyInt
+  Quantity     Int      @default(0, map: "DF_ProductInventory_Quantity") @db.SmallInt
+  rowguid      String   @default(dbgenerated("newid()"), map: "DF_ProductInventory_rowguid") @db.UniqueIdentifier
+  ModifiedDate DateTime @default(now(), map: "DF_ProductInventory_ModifiedDate") @db.DateTime
+  Location     Location @relation(fields: [LocationID], references: [LocationID], onUpdate: NoAction, map: "FK_ProductInventory_Location_LocationID")
+  Product      Product  @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductInventory_Product_ProductID")
+
+  @@id([ProductID, LocationID], map: "PK_ProductInventory_ProductID_LocationID")
+  @@schema("Production")
+}
+
+model ProductListPriceHistory {
+  ProductID    Int
+  StartDate    DateTime  @db.DateTime
+  EndDate      DateTime? @db.DateTime
+  ListPrice    Float     @db.Money
+  ModifiedDate DateTime  @default(now(), map: "DF_ProductListPriceHistory_ModifiedDate") @db.DateTime
+  Product      Product   @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductListPriceHistory_Product_ProductID")
+
+  @@id([ProductID, StartDate], map: "PK_ProductListPriceHistory_ProductID_StartDate")
+  @@schema("Production")
+}
+
+model ProductModel {
+  ProductModelID                        Int                                     @id(map: "PK_ProductModel_ProductModelID") @default(autoincrement())
+  Name                                  String                                  @unique(map: "AK_ProductModel_Name") @db.NVarChar(50)
+  CatalogDescription                    String?                                 @db.Xml
+  Instructions                          String?                                 @db.Xml
+  rowguid                               String                                  @unique(map: "AK_ProductModel_rowguid") @default(dbgenerated("newid()"), map: "DF_ProductModel_rowguid") @db.UniqueIdentifier
+  ModifiedDate                          DateTime                                @default(now(), map: "DF_ProductModel_ModifiedDate") @db.DateTime
+  Product                               Product[]
+  ProductModelIllustration              ProductModelIllustration[]
+  ProductModelProductDescriptionCulture ProductModelProductDescriptionCulture[]
+
+  @@schema("Production")
+}
+
+model ProductModelIllustration {
+  ProductModelID Int
+  IllustrationID Int
+  ModifiedDate   DateTime     @default(now(), map: "DF_ProductModelIllustration_ModifiedDate") @db.DateTime
+  Illustration   Illustration @relation(fields: [IllustrationID], references: [IllustrationID], onUpdate: NoAction, map: "FK_ProductModelIllustration_Illustration_IllustrationID")
+  ProductModel   ProductModel @relation(fields: [ProductModelID], references: [ProductModelID], onUpdate: NoAction, map: "FK_ProductModelIllustration_ProductModel_ProductModelID")
+
+  @@id([ProductModelID, IllustrationID], map: "PK_ProductModelIllustration_ProductModelID_IllustrationID")
+  @@schema("Production")
+}
+
+model ProductModelProductDescriptionCulture {
+  ProductModelID       Int
+  ProductDescriptionID Int
+  CultureID            String             @db.NChar(6)
+  ModifiedDate         DateTime           @default(now(), map: "DF_ProductModelProductDescriptionCulture_ModifiedDate") @db.DateTime
+  Culture              Culture            @relation(fields: [CultureID], references: [CultureID], onUpdate: NoAction, map: "FK_ProductModelProductDescriptionCulture_Culture_CultureID")
+  ProductDescription   ProductDescription @relation(fields: [ProductDescriptionID], references: [ProductDescriptionID], onUpdate: NoAction, map: "FK_ProductModelProductDescriptionCulture_ProductDescription_ProductDescriptionID")
+  ProductModel         ProductModel       @relation(fields: [ProductModelID], references: [ProductModelID], onUpdate: NoAction, map: "FK_ProductModelProductDescriptionCulture_ProductModel_ProductModelID")
+
+  @@id([ProductModelID, ProductDescriptionID, CultureID], map: "PK_ProductModelProductDescriptionCulture_ProductModelID_ProductDescriptionID_CultureID")
+  @@schema("Production")
+}
+
+model ProductPhoto {
+  ProductPhotoID         Int                   @id(map: "PK_ProductPhoto_ProductPhotoID") @default(autoincrement())
+  ThumbNailPhoto         Bytes?
+  ThumbnailPhotoFileName String?               @db.NVarChar(50)
+  LargePhoto             Bytes?
+  LargePhotoFileName     String?               @db.NVarChar(50)
+  ModifiedDate           DateTime              @default(now(), map: "DF_ProductPhoto_ModifiedDate") @db.DateTime
+  ProductProductPhoto    ProductProductPhoto[]
+
+  @@schema("Production")
+}
+
+model ProductProductPhoto {
+  ProductID      Int
+  ProductPhotoID Int
+  Primary        Boolean      @default(false, map: "DF_ProductProductPhoto_Primary")
+  ModifiedDate   DateTime     @default(now(), map: "DF_ProductProductPhoto_ModifiedDate") @db.DateTime
+  Product        Product      @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductProductPhoto_Product_ProductID")
+  ProductPhoto   ProductPhoto @relation(fields: [ProductPhotoID], references: [ProductPhotoID], onUpdate: NoAction, map: "FK_ProductProductPhoto_ProductPhoto_ProductPhotoID")
+
+  @@id([ProductID, ProductPhotoID], map: "PK_ProductProductPhoto_ProductID_ProductPhotoID", clustered: false)
+  @@schema("Production")
+}
+
+model ProductReview {
+  ProductReviewID Int      @id(map: "PK_ProductReview_ProductReviewID") @default(autoincrement())
+  ProductID       Int
+  ReviewerName    String   @db.NVarChar(50)
+  ReviewDate      DateTime @default(now(), map: "DF_ProductReview_ReviewDate") @db.DateTime
+  EmailAddress    String   @db.NVarChar(50)
+  Rating          Int
+  Comments        String?  @db.NVarChar(3850)
+  ModifiedDate    DateTime @default(now(), map: "DF_ProductReview_ModifiedDate") @db.DateTime
+  Product         Product  @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductReview_Product_ProductID")
+
+  @@index([ProductID, ReviewerName], map: "IX_ProductReview_ProductID_Name")
+  @@schema("Production")
+}
+
+model ProductSubcategory {
+  ProductSubcategoryID Int             @id(map: "PK_ProductSubcategory_ProductSubcategoryID") @default(autoincrement())
+  ProductCategoryID    Int
+  Name                 String          @unique(map: "AK_ProductSubcategory_Name") @db.NVarChar(50)
+  rowguid              String          @unique(map: "AK_ProductSubcategory_rowguid") @default(dbgenerated("newid()"), map: "DF_ProductSubcategory_rowguid") @db.UniqueIdentifier
+  ModifiedDate         DateTime        @default(now(), map: "DF_ProductSubcategory_ModifiedDate") @db.DateTime
+  Product              Product[]
+  ProductCategory      ProductCategory @relation(fields: [ProductCategoryID], references: [ProductCategoryID], onUpdate: NoAction, map: "FK_ProductSubcategory_ProductCategory_ProductCategoryID")
+
+  @@schema("Production")
+}
+
+model ProductVendor {
+  ProductID        Int
+  BusinessEntityID Int
+  AverageLeadTime  Int
+  StandardPrice    Float       @db.Money
+  LastReceiptCost  Float?      @db.Money
+  LastReceiptDate  DateTime?   @db.DateTime
+  MinOrderQty      Int
+  MaxOrderQty      Int
+  OnOrderQty       Int?
+  UnitMeasureCode  String      @db.NChar(3)
+  ModifiedDate     DateTime    @default(now(), map: "DF_ProductVendor_ModifiedDate") @db.DateTime
+  Product          Product     @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ProductVendor_Product_ProductID")
+  UnitMeasure      UnitMeasure @relation(fields: [UnitMeasureCode], references: [UnitMeasureCode], onUpdate: NoAction, map: "FK_ProductVendor_UnitMeasure_UnitMeasureCode")
+  Vendor           Vendor      @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_ProductVendor_Vendor_BusinessEntityID")
+
+  @@id([ProductID, BusinessEntityID], map: "PK_ProductVendor_ProductID_BusinessEntityID")
+  @@index([BusinessEntityID], map: "IX_ProductVendor_BusinessEntityID")
+  @@index([UnitMeasureCode], map: "IX_ProductVendor_UnitMeasureCode")
+  @@schema("Purchasing")
+}
+
+model PurchaseOrderDetail {
+  PurchaseOrderID       Int
+  PurchaseOrderDetailID Int                 @default(autoincrement())
+  DueDate               DateTime            @db.DateTime
+  OrderQty              Int                 @db.SmallInt
+  ProductID             Int
+  UnitPrice             Float               @db.Money
+  LineTotal             Float               @db.Money
+  ReceivedQty           Decimal             @db.Decimal(8, 2)
+  RejectedQty           Decimal             @db.Decimal(8, 2)
+  StockedQty            Decimal             @db.Decimal(9, 2)
+  ModifiedDate          DateTime            @default(now(), map: "DF_PurchaseOrderDetail_ModifiedDate") @db.DateTime
+  Product               Product             @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_PurchaseOrderDetail_Product_ProductID")
+  PurchaseOrderHeader   PurchaseOrderHeader @relation(fields: [PurchaseOrderID], references: [PurchaseOrderID], onUpdate: NoAction, map: "FK_PurchaseOrderDetail_PurchaseOrderHeader_PurchaseOrderID")
+
+  @@id([PurchaseOrderID, PurchaseOrderDetailID], map: "PK_PurchaseOrderDetail_PurchaseOrderID_PurchaseOrderDetailID")
+  @@index([ProductID], map: "IX_PurchaseOrderDetail_ProductID")
+  @@schema("Purchasing")
+}
+
+model PurchaseOrderHeader {
+  PurchaseOrderID     Int                   @id(map: "PK_PurchaseOrderHeader_PurchaseOrderID") @default(autoincrement())
+  RevisionNumber      Int                   @default(0, map: "DF_PurchaseOrderHeader_RevisionNumber") @db.TinyInt
+  Status              Int                   @default(1, map: "DF_PurchaseOrderHeader_Status") @db.TinyInt
+  EmployeeID          Int
+  VendorID            Int
+  ShipMethodID        Int
+  OrderDate           DateTime              @default(now(), map: "DF_PurchaseOrderHeader_OrderDate") @db.DateTime
+  ShipDate            DateTime?             @db.DateTime
+  SubTotal            Float                 @default(0.00, map: "DF_PurchaseOrderHeader_SubTotal") @db.Money
+  TaxAmt              Float                 @default(0.00, map: "DF_PurchaseOrderHeader_TaxAmt") @db.Money
+  Freight             Float                 @default(0.00, map: "DF_PurchaseOrderHeader_Freight") @db.Money
+  TotalDue            Float                 @db.Money
+  ModifiedDate        DateTime              @default(now(), map: "DF_PurchaseOrderHeader_ModifiedDate") @db.DateTime
+  PurchaseOrderDetail PurchaseOrderDetail[]
+  Employee            Employee              @relation(fields: [EmployeeID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_PurchaseOrderHeader_Employee_EmployeeID")
+  ShipMethod          ShipMethod            @relation(fields: [ShipMethodID], references: [ShipMethodID], onUpdate: NoAction, map: "FK_PurchaseOrderHeader_ShipMethod_ShipMethodID")
+  Vendor              Vendor                @relation(fields: [VendorID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_PurchaseOrderHeader_Vendor_VendorID")
+
+  @@index([EmployeeID], map: "IX_PurchaseOrderHeader_EmployeeID")
+  @@index([VendorID], map: "IX_PurchaseOrderHeader_VendorID")
+  @@schema("Purchasing")
+}
+
+model SalesOrderDetail {
+  SalesOrderID          Int
+  SalesOrderDetailID    Int                 @default(autoincrement())
+  CarrierTrackingNumber String?             @db.NVarChar(25)
+  OrderQty              Int                 @db.SmallInt
+  ProductID             Int
+  SpecialOfferID        Int
+  UnitPrice             Float               @db.Money
+  UnitPriceDiscount     Float               @default(0.0, map: "DF_SalesOrderDetail_UnitPriceDiscount") @db.Money
+  LineTotal             Decimal             @db.Decimal(38, 6)
+  rowguid               String              @unique(map: "AK_SalesOrderDetail_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesOrderDetail_rowguid") @db.UniqueIdentifier
+  ModifiedDate          DateTime            @default(now(), map: "DF_SalesOrderDetail_ModifiedDate") @db.DateTime
+  SalesOrderHeader      SalesOrderHeader    @relation(fields: [SalesOrderID], references: [SalesOrderID], onDelete: Cascade, onUpdate: NoAction, map: "FK_SalesOrderDetail_SalesOrderHeader_SalesOrderID")
+  SpecialOfferProduct   SpecialOfferProduct @relation(fields: [SpecialOfferID, ProductID], references: [SpecialOfferID, ProductID], onUpdate: NoAction, map: "FK_SalesOrderDetail_SpecialOfferProduct_SpecialOfferIDProductID")
+
+  @@id([SalesOrderID, SalesOrderDetailID], map: "PK_SalesOrderDetail_SalesOrderID_SalesOrderDetailID")
+  @@index([ProductID], map: "IX_SalesOrderDetail_ProductID")
+  @@schema("Sales")
+}
+
+model SalesOrderHeader {
+  SalesOrderID                                      Int                           @id(map: "PK_SalesOrderHeader_SalesOrderID") @default(autoincrement())
+  RevisionNumber                                    Int                           @default(0, map: "DF_SalesOrderHeader_RevisionNumber") @db.TinyInt
+  OrderDate                                         DateTime                      @default(now(), map: "DF_SalesOrderHeader_OrderDate") @db.DateTime
+  DueDate                                           DateTime                      @db.DateTime
+  ShipDate                                          DateTime?                     @db.DateTime
+  Status                                            Int                           @default(1, map: "DF_SalesOrderHeader_Status") @db.TinyInt
+  OnlineOrderFlag                                   Boolean                       @default(true, map: "DF_SalesOrderHeader_OnlineOrderFlag")
+  SalesOrderNumber                                  String                        @unique(map: "AK_SalesOrderHeader_SalesOrderNumber") @db.NVarChar(25)
+  PurchaseOrderNumber                               String?                       @db.NVarChar(25)
+  AccountNumber                                     String?                       @db.NVarChar(15)
+  CustomerID                                        Int
+  SalesPersonID                                     Int?
+  TerritoryID                                       Int?
+  BillToAddressID                                   Int
+  ShipToAddressID                                   Int
+  ShipMethodID                                      Int
+  CreditCardID                                      Int?
+  CreditCardApprovalCode                            String?                       @db.VarChar(15)
+  CurrencyRateID                                    Int?
+  SubTotal                                          Float                         @default(0.00, map: "DF_SalesOrderHeader_SubTotal") @db.Money
+  TaxAmt                                            Float                         @default(0.00, map: "DF_SalesOrderHeader_TaxAmt") @db.Money
+  Freight                                           Float                         @default(0.00, map: "DF_SalesOrderHeader_Freight") @db.Money
+  TotalDue                                          Float                         @db.Money
+  Comment                                           String?                       @db.NVarChar(128)
+  rowguid                                           String                        @unique(map: "AK_SalesOrderHeader_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesOrderHeader_rowguid") @db.UniqueIdentifier
+  ModifiedDate                                      DateTime                      @default(now(), map: "DF_SalesOrderHeader_ModifiedDate") @db.DateTime
+  SalesOrderDetail                                  SalesOrderDetail[]
+  Address_SalesOrderHeader_BillToAddressIDToAddress Address                       @relation("SalesOrderHeader_BillToAddressIDToAddress", fields: [BillToAddressID], references: [AddressID], onUpdate: NoAction, map: "FK_SalesOrderHeader_Address_BillToAddressID")
+  Address_SalesOrderHeader_ShipToAddressIDToAddress Address                       @relation("SalesOrderHeader_ShipToAddressIDToAddress", fields: [ShipToAddressID], references: [AddressID], onUpdate: NoAction, map: "FK_SalesOrderHeader_Address_ShipToAddressID")
+  CreditCard                                        CreditCard?                   @relation(fields: [CreditCardID], references: [CreditCardID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SalesOrderHeader_CreditCard_CreditCardID")
+  CurrencyRate                                      CurrencyRate?                 @relation(fields: [CurrencyRateID], references: [CurrencyRateID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SalesOrderHeader_CurrencyRate_CurrencyRateID")
+  Customer                                          Customer                      @relation(fields: [CustomerID], references: [CustomerID], onUpdate: NoAction, map: "FK_SalesOrderHeader_Customer_CustomerID")
+  SalesPerson                                       SalesPerson?                  @relation(fields: [SalesPersonID], references: [BusinessEntityID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SalesOrderHeader_SalesPerson_SalesPersonID")
+  SalesTerritory                                    SalesTerritory?               @relation(fields: [TerritoryID], references: [TerritoryID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SalesOrderHeader_SalesTerritory_TerritoryID")
+  ShipMethod                                        ShipMethod                    @relation(fields: [ShipMethodID], references: [ShipMethodID], onUpdate: NoAction, map: "FK_SalesOrderHeader_ShipMethod_ShipMethodID")
+  SalesOrderHeaderSalesReason                       SalesOrderHeaderSalesReason[]
+
+  @@index([CustomerID], map: "IX_SalesOrderHeader_CustomerID")
+  @@index([SalesPersonID], map: "IX_SalesOrderHeader_SalesPersonID")
+  @@schema("Sales")
+}
+
+model SalesOrderHeaderSalesReason {
+  SalesOrderID     Int
+  SalesReasonID    Int
+  ModifiedDate     DateTime         @default(now(), map: "DF_SalesOrderHeaderSalesReason_ModifiedDate") @db.DateTime
+  SalesOrderHeader SalesOrderHeader @relation(fields: [SalesOrderID], references: [SalesOrderID], onDelete: Cascade, onUpdate: NoAction, map: "FK_SalesOrderHeaderSalesReason_SalesOrderHeader_SalesOrderID")
+  SalesReason      SalesReason      @relation(fields: [SalesReasonID], references: [SalesReasonID], onUpdate: NoAction, map: "FK_SalesOrderHeaderSalesReason_SalesReason_SalesReasonID")
+
+  @@id([SalesOrderID, SalesReasonID], map: "PK_SalesOrderHeaderSalesReason_SalesOrderID_SalesReasonID")
+  @@schema("Sales")
+}
+
+model SalesPerson {
+  BusinessEntityID        Int                       @id(map: "PK_SalesPerson_BusinessEntityID")
+  TerritoryID             Int?
+  SalesQuota              Float?                    @db.Money
+  Bonus                   Float                     @default(0.00, map: "DF_SalesPerson_Bonus") @db.Money
+  CommissionPct           Float                     @default(0.00, map: "DF_SalesPerson_CommissionPct") @db.SmallMoney
+  SalesYTD                Float                     @default(0.00, map: "DF_SalesPerson_SalesYTD") @db.Money
+  SalesLastYear           Float                     @default(0.00, map: "DF_SalesPerson_SalesLastYear") @db.Money
+  rowguid                 String                    @unique(map: "AK_SalesPerson_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesPerson_rowguid") @db.UniqueIdentifier
+  ModifiedDate            DateTime                  @default(now(), map: "DF_SalesPerson_ModifiedDate") @db.DateTime
+  SalesOrderHeader        SalesOrderHeader[]
+  Employee                Employee                  @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_SalesPerson_Employee_BusinessEntityID")
+  SalesTerritory          SalesTerritory?           @relation(fields: [TerritoryID], references: [TerritoryID], onDelete: NoAction, onUpdate: NoAction, map: "FK_SalesPerson_SalesTerritory_TerritoryID")
+  SalesPersonQuotaHistory SalesPersonQuotaHistory[]
+  SalesTerritoryHistory   SalesTerritoryHistory[]
+  Store                   Store[]
+
+  @@schema("Sales")
+}
+
+model SalesPersonQuotaHistory {
+  BusinessEntityID Int
+  QuotaDate        DateTime    @db.DateTime
+  SalesQuota       Float       @db.Money
+  rowguid          String      @unique(map: "AK_SalesPersonQuotaHistory_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesPersonQuotaHistory_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime    @default(now(), map: "DF_SalesPersonQuotaHistory_ModifiedDate") @db.DateTime
+  SalesPerson      SalesPerson @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_SalesPersonQuotaHistory_SalesPerson_BusinessEntityID")
+
+  @@id([BusinessEntityID, QuotaDate], map: "PK_SalesPersonQuotaHistory_BusinessEntityID_QuotaDate")
+  @@schema("Sales")
+}
+
+model SalesReason {
+  SalesReasonID               Int                           @id(map: "PK_SalesReason_SalesReasonID") @default(autoincrement())
+  Name                        String                        @db.NVarChar(50)
+  ReasonType                  String                        @db.NVarChar(50)
+  ModifiedDate                DateTime                      @default(now(), map: "DF_SalesReason_ModifiedDate") @db.DateTime
+  SalesOrderHeaderSalesReason SalesOrderHeaderSalesReason[]
+
+  @@schema("Sales")
+}
+
+model SalesTaxRate {
+  SalesTaxRateID  Int           @id(map: "PK_SalesTaxRate_SalesTaxRateID") @default(autoincrement())
+  StateProvinceID Int
+  TaxType         Int           @db.TinyInt
+  TaxRate         Float         @default(0.00, map: "DF_SalesTaxRate_TaxRate") @db.SmallMoney
+  Name            String        @db.NVarChar(50)
+  rowguid         String        @unique(map: "AK_SalesTaxRate_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesTaxRate_rowguid") @db.UniqueIdentifier
+  ModifiedDate    DateTime      @default(now(), map: "DF_SalesTaxRate_ModifiedDate") @db.DateTime
+  StateProvince   StateProvince @relation(fields: [StateProvinceID], references: [StateProvinceID], onUpdate: NoAction, map: "FK_SalesTaxRate_StateProvince_StateProvinceID")
+
+  @@unique([StateProvinceID, TaxType], map: "AK_SalesTaxRate_StateProvinceID_TaxType")
+  @@schema("Sales")
+}
+
+model SalesTerritory {
+  TerritoryID           Int                     @id(map: "PK_SalesTerritory_TerritoryID") @default(autoincrement())
+  Name                  String                  @unique(map: "AK_SalesTerritory_Name") @db.NVarChar(50)
+  CountryRegionCode     String                  @db.NVarChar(3)
+  Group                 String                  @db.NVarChar(50)
+  SalesYTD              Float                   @default(0.00, map: "DF_SalesTerritory_SalesYTD") @db.Money
+  SalesLastYear         Float                   @default(0.00, map: "DF_SalesTerritory_SalesLastYear") @db.Money
+  CostYTD               Float                   @default(0.00, map: "DF_SalesTerritory_CostYTD") @db.Money
+  CostLastYear          Float                   @default(0.00, map: "DF_SalesTerritory_CostLastYear") @db.Money
+  rowguid               String                  @unique(map: "AK_SalesTerritory_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesTerritory_rowguid") @db.UniqueIdentifier
+  ModifiedDate          DateTime                @default(now(), map: "DF_SalesTerritory_ModifiedDate") @db.DateTime
+  Customer              Customer[]
+  SalesOrderHeader      SalesOrderHeader[]
+  SalesPerson           SalesPerson[]
+  CountryRegion         CountryRegion           @relation(fields: [CountryRegionCode], references: [CountryRegionCode], onUpdate: NoAction, map: "FK_SalesTerritory_CountryRegion_CountryRegionCode")
+  SalesTerritoryHistory SalesTerritoryHistory[]
+  StateProvince         StateProvince[]
+
+  @@schema("Sales")
+}
+
+model SalesTerritoryHistory {
+  BusinessEntityID Int
+  TerritoryID      Int
+  StartDate        DateTime       @db.DateTime
+  EndDate          DateTime?      @db.DateTime
+  rowguid          String         @unique(map: "AK_SalesTerritoryHistory_rowguid") @default(dbgenerated("newid()"), map: "DF_SalesTerritoryHistory_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime       @default(now(), map: "DF_SalesTerritoryHistory_ModifiedDate") @db.DateTime
+  SalesPerson      SalesPerson    @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_SalesTerritoryHistory_SalesPerson_BusinessEntityID")
+  SalesTerritory   SalesTerritory @relation(fields: [TerritoryID], references: [TerritoryID], onUpdate: NoAction, map: "FK_SalesTerritoryHistory_SalesTerritory_TerritoryID")
+
+  @@id([BusinessEntityID, StartDate, TerritoryID], map: "PK_SalesTerritoryHistory_BusinessEntityID_StartDate_TerritoryID")
+  @@schema("Sales")
+}
+
+model ScrapReason {
+  ScrapReasonID Int         @id(map: "PK_ScrapReason_ScrapReasonID") @default(autoincrement()) @db.SmallInt
+  Name          String      @unique(map: "AK_ScrapReason_Name") @db.NVarChar(50)
+  ModifiedDate  DateTime    @default(now(), map: "DF_ScrapReason_ModifiedDate") @db.DateTime
+  WorkOrder     WorkOrder[]
+
+  @@schema("Production")
+}
+
+model Shift {
+  ShiftID                   Int                         @id(map: "PK_Shift_ShiftID") @default(autoincrement()) @db.TinyInt
+  Name                      String                      @unique(map: "AK_Shift_Name") @db.NVarChar(50)
+  StartTime                 DateTime                    @db.Time
+  EndTime                   DateTime                    @db.Time
+  ModifiedDate              DateTime                    @default(now(), map: "DF_Shift_ModifiedDate") @db.DateTime
+  EmployeeDepartmentHistory EmployeeDepartmentHistory[]
+
+  @@unique([StartTime, EndTime], map: "AK_Shift_StartTime_EndTime")
+  @@schema("HumanResources")
+}
+
+model ShipMethod {
+  ShipMethodID        Int                   @id(map: "PK_ShipMethod_ShipMethodID") @default(autoincrement())
+  Name                String                @unique(map: "AK_ShipMethod_Name") @db.NVarChar(50)
+  ShipBase            Float                 @default(0.00, map: "DF_ShipMethod_ShipBase") @db.Money
+  ShipRate            Float                 @default(0.00, map: "DF_ShipMethod_ShipRate") @db.Money
+  rowguid             String                @unique(map: "AK_ShipMethod_rowguid") @default(dbgenerated("newid()"), map: "DF_ShipMethod_rowguid") @db.UniqueIdentifier
+  ModifiedDate        DateTime              @default(now(), map: "DF_ShipMethod_ModifiedDate") @db.DateTime
+  PurchaseOrderHeader PurchaseOrderHeader[]
+  SalesOrderHeader    SalesOrderHeader[]
+
+  @@schema("Purchasing")
+}
+
+model ShoppingCartItem {
+  ShoppingCartItemID Int      @id(map: "PK_ShoppingCartItem_ShoppingCartItemID") @default(autoincrement())
+  ShoppingCartID     String   @db.NVarChar(50)
+  Quantity           Int      @default(1, map: "DF_ShoppingCartItem_Quantity")
+  ProductID          Int
+  DateCreated        DateTime @default(now(), map: "DF_ShoppingCartItem_DateCreated") @db.DateTime
+  ModifiedDate       DateTime @default(now(), map: "DF_ShoppingCartItem_ModifiedDate") @db.DateTime
+  Product            Product  @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_ShoppingCartItem_Product_ProductID")
+
+  @@index([ShoppingCartID, ProductID], map: "IX_ShoppingCartItem_ShoppingCartID_ProductID")
+  @@schema("Sales")
+}
+
+model SpecialOffer {
+  SpecialOfferID      Int                   @id(map: "PK_SpecialOffer_SpecialOfferID") @default(autoincrement())
+  Description         String                @db.NVarChar(255)
+  DiscountPct         Float                 @default(0.00, map: "DF_SpecialOffer_DiscountPct") @db.SmallMoney
+  Type                String                @db.NVarChar(50)
+  Category            String                @db.NVarChar(50)
+  StartDate           DateTime              @db.DateTime
+  EndDate             DateTime              @db.DateTime
+  MinQty              Int                   @default(0, map: "DF_SpecialOffer_MinQty")
+  MaxQty              Int?
+  rowguid             String                @unique(map: "AK_SpecialOffer_rowguid") @default(dbgenerated("newid()"), map: "DF_SpecialOffer_rowguid") @db.UniqueIdentifier
+  ModifiedDate        DateTime              @default(now(), map: "DF_SpecialOffer_ModifiedDate") @db.DateTime
+  SpecialOfferProduct SpecialOfferProduct[]
+
+  @@schema("Sales")
+}
+
+model SpecialOfferProduct {
+  SpecialOfferID   Int
+  ProductID        Int
+  rowguid          String             @unique(map: "AK_SpecialOfferProduct_rowguid") @default(dbgenerated("newid()"), map: "DF_SpecialOfferProduct_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime           @default(now(), map: "DF_SpecialOfferProduct_ModifiedDate") @db.DateTime
+  SalesOrderDetail SalesOrderDetail[]
+  Product          Product            @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_SpecialOfferProduct_Product_ProductID")
+  SpecialOffer     SpecialOffer       @relation(fields: [SpecialOfferID], references: [SpecialOfferID], onUpdate: NoAction, map: "FK_SpecialOfferProduct_SpecialOffer_SpecialOfferID")
+
+  @@id([SpecialOfferID, ProductID], map: "PK_SpecialOfferProduct_SpecialOfferID_ProductID")
+  @@index([ProductID], map: "IX_SpecialOfferProduct_ProductID")
+  @@schema("Sales")
+}
+
+model StateProvince {
+  StateProvinceID         Int            @id(map: "PK_StateProvince_StateProvinceID") @default(autoincrement())
+  StateProvinceCode       String         @db.NChar(3)
+  CountryRegionCode       String         @db.NVarChar(3)
+  IsOnlyStateProvinceFlag Boolean        @default(true, map: "DF_StateProvince_IsOnlyStateProvinceFlag")
+  Name                    String         @unique(map: "AK_StateProvince_Name") @db.NVarChar(50)
+  TerritoryID             Int
+  rowguid                 String         @unique(map: "AK_StateProvince_rowguid") @default(dbgenerated("newid()"), map: "DF_StateProvince_rowguid") @db.UniqueIdentifier
+  ModifiedDate            DateTime       @default(now(), map: "DF_StateProvince_ModifiedDate") @db.DateTime
+  Address                 Address[]
+  SalesTaxRate            SalesTaxRate[]
+  CountryRegion           CountryRegion  @relation(fields: [CountryRegionCode], references: [CountryRegionCode], onUpdate: NoAction, map: "FK_StateProvince_CountryRegion_CountryRegionCode")
+  SalesTerritory          SalesTerritory @relation(fields: [TerritoryID], references: [TerritoryID], onUpdate: NoAction, map: "FK_StateProvince_SalesTerritory_TerritoryID")
+
+  @@unique([StateProvinceCode, CountryRegionCode], map: "AK_StateProvince_StateProvinceCode_CountryRegionCode")
+  @@schema("Person")
+}
+
+model Store {
+  BusinessEntityID Int            @id(map: "PK_Store_BusinessEntityID")
+  Name             String         @db.NVarChar(50)
+  SalesPersonID    Int?
+  Demographics     String?        @db.Xml
+  rowguid          String         @unique(map: "AK_Store_rowguid") @default(dbgenerated("newid()"), map: "DF_Store_rowguid") @db.UniqueIdentifier
+  ModifiedDate     DateTime       @default(now(), map: "DF_Store_ModifiedDate") @db.DateTime
+  Customer         Customer[]
+  BusinessEntity   BusinessEntity @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Store_BusinessEntity_BusinessEntityID")
+  SalesPerson      SalesPerson?   @relation(fields: [SalesPersonID], references: [BusinessEntityID], onDelete: NoAction, onUpdate: NoAction, map: "FK_Store_SalesPerson_SalesPersonID")
+
+  @@index([SalesPersonID], map: "IX_Store_SalesPersonID")
+  @@schema("Sales")
+}
+
+model TransactionHistory {
+  TransactionID        Int      @id(map: "PK_TransactionHistory_TransactionID") @default(autoincrement())
+  ProductID            Int
+  ReferenceOrderID     Int
+  ReferenceOrderLineID Int      @default(0, map: "DF_TransactionHistory_ReferenceOrderLineID")
+  TransactionDate      DateTime @default(now(), map: "DF_TransactionHistory_TransactionDate") @db.DateTime
+  TransactionType      String   @db.NChar(1)
+  Quantity             Int
+  ActualCost           Float    @db.Money
+  ModifiedDate         DateTime @default(now(), map: "DF_TransactionHistory_ModifiedDate") @db.DateTime
+  Product              Product  @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_TransactionHistory_Product_ProductID")
+
+  @@index([ProductID], map: "IX_TransactionHistory_ProductID")
+  @@index([ReferenceOrderID, ReferenceOrderLineID], map: "IX_TransactionHistory_ReferenceOrderID_ReferenceOrderLineID")
+  @@schema("Production")
+}
+
+model TransactionHistoryArchive {
+  TransactionID        Int      @id(map: "PK_TransactionHistoryArchive_TransactionID")
+  ProductID            Int
+  ReferenceOrderID     Int
+  ReferenceOrderLineID Int      @default(0, map: "DF_TransactionHistoryArchive_ReferenceOrderLineID")
+  TransactionDate      DateTime @default(now(), map: "DF_TransactionHistoryArchive_TransactionDate") @db.DateTime
+  TransactionType      String   @db.NChar(1)
+  Quantity             Int
+  ActualCost           Float    @db.Money
+  ModifiedDate         DateTime @default(now(), map: "DF_TransactionHistoryArchive_ModifiedDate") @db.DateTime
+
+  @@index([ProductID], map: "IX_TransactionHistoryArchive_ProductID")
+  @@index([ReferenceOrderID, ReferenceOrderLineID], map: "IX_TransactionHistoryArchive_ReferenceOrderID_ReferenceOrderLineID")
+  @@schema("Production")
+}
+
+model UnitMeasure {
+  UnitMeasureCode                                    String            @id(map: "PK_UnitMeasure_UnitMeasureCode") @db.NChar(3)
+  Name                                               String            @unique(map: "AK_UnitMeasure_Name") @db.NVarChar(50)
+  ModifiedDate                                       DateTime          @default(now(), map: "DF_UnitMeasure_ModifiedDate") @db.DateTime
+  BillOfMaterials                                    BillOfMaterials[]
+  Product_Product_SizeUnitMeasureCodeToUnitMeasure   Product[]         @relation("Product_SizeUnitMeasureCodeToUnitMeasure")
+  Product_Product_WeightUnitMeasureCodeToUnitMeasure Product[]         @relation("Product_WeightUnitMeasureCodeToUnitMeasure")
+  ProductVendor                                      ProductVendor[]
+
+  @@schema("Production")
+}
+
+model Vendor {
+  BusinessEntityID        Int                   @id(map: "PK_Vendor_BusinessEntityID")
+  AccountNumber           String                @unique(map: "AK_Vendor_AccountNumber") @db.NVarChar(15)
+  Name                    String                @db.NVarChar(50)
+  CreditRating            Int                   @db.TinyInt
+  PreferredVendorStatus   Boolean               @default(true, map: "DF_Vendor_PreferredVendorStatus")
+  ActiveFlag              Boolean               @default(true, map: "DF_Vendor_ActiveFlag")
+  PurchasingWebServiceURL String?               @db.NVarChar(1024)
+  ModifiedDate            DateTime              @default(now(), map: "DF_Vendor_ModifiedDate") @db.DateTime
+  ProductVendor           ProductVendor[]
+  PurchaseOrderHeader     PurchaseOrderHeader[]
+  BusinessEntity          BusinessEntity        @relation(fields: [BusinessEntityID], references: [BusinessEntityID], onUpdate: NoAction, map: "FK_Vendor_BusinessEntity_BusinessEntityID")
+
+  @@schema("Purchasing")
+}
+
+model WorkOrder {
+  WorkOrderID      Int                @id(map: "PK_WorkOrder_WorkOrderID") @default(autoincrement())
+  ProductID        Int
+  OrderQty         Int
+  StockedQty       Int
+  ScrappedQty      Int                @db.SmallInt
+  StartDate        DateTime           @db.DateTime
+  EndDate          DateTime?          @db.DateTime
+  DueDate          DateTime           @db.DateTime
+  ScrapReasonID    Int?               @db.SmallInt
+  ModifiedDate     DateTime           @default(now(), map: "DF_WorkOrder_ModifiedDate") @db.DateTime
+  Product          Product            @relation(fields: [ProductID], references: [ProductID], onUpdate: NoAction, map: "FK_WorkOrder_Product_ProductID")
+  ScrapReason      ScrapReason?       @relation(fields: [ScrapReasonID], references: [ScrapReasonID], onDelete: NoAction, onUpdate: NoAction, map: "FK_WorkOrder_ScrapReason_ScrapReasonID")
+  WorkOrderRouting WorkOrderRouting[]
+
+  @@index([ProductID], map: "IX_WorkOrder_ProductID")
+  @@index([ScrapReasonID], map: "IX_WorkOrder_ScrapReasonID")
+  @@schema("Production")
+}
+
+model WorkOrderRouting {
+  WorkOrderID        Int
+  ProductID          Int
+  OperationSequence  Int       @db.SmallInt
+  LocationID         Int       @db.SmallInt
+  ScheduledStartDate DateTime  @db.DateTime
+  ScheduledEndDate   DateTime  @db.DateTime
+  ActualStartDate    DateTime? @db.DateTime
+  ActualEndDate      DateTime? @db.DateTime
+  ActualResourceHrs  Decimal?  @db.Decimal(9, 4)
+  PlannedCost        Float     @db.Money
+  ActualCost         Float?    @db.Money
+  ModifiedDate       DateTime  @default(now(), map: "DF_WorkOrderRouting_ModifiedDate") @db.DateTime
+  Location           Location  @relation(fields: [LocationID], references: [LocationID], onUpdate: NoAction, map: "FK_WorkOrderRouting_Location_LocationID")
+  WorkOrder          WorkOrder @relation(fields: [WorkOrderID], references: [WorkOrderID], onUpdate: NoAction, map: "FK_WorkOrderRouting_WorkOrder_WorkOrderID")
+
+  @@id([WorkOrderID, ProductID, OperationSequence], map: "PK_WorkOrderRouting_WorkOrderID_ProductID_OperationSequence")
+  @@index([ProductID], map: "IX_WorkOrderRouting_ProductID")
+  @@schema("Production")
+}

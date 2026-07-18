@@ -11,6 +11,7 @@ data/processed/clean-articles.json
 data/logs/onboarding_failures.json
 data/logs/dubious_for_review.json
 data/logs/vendor_rejections.csv
+logs/
 
 # Environment and system files
 .env
