@@ -71,16 +71,32 @@ export class ZalandoTransformer {
   private transformMedia(photoRelations: any[]) {
     if (!photoRelations || !Array.isArray(photoRelations)) return [];
 
-    return photoRelations.map((relation, index) => {
-      const photo = relation.ProductPhoto;
-      if (!photo) return null;
+    const mediaObjects = [];
+    let sortKey = 1;
 
-      // STRICT RULE 3: MinIO URL formatting, no base64
-      return {
-        url: `https://minio.local/bucket/${photo.ThumbnailPhotoFileName}`,
-        media_sort_key: index + 1,
-        media_category: 'IMAGE'
-      };
-    }).filter(Boolean);
+    for (const relation of photoRelations) {
+      const photo = relation.ProductPhoto;
+      if (!photo) continue;
+
+      // Process Thumbnail
+      if (photo.ThumbnailPhotoFileName) {
+        mediaObjects.push({
+          url: `https://minio.local/bucket/${photo.ThumbnailPhotoFileName}`,
+          media_sort_key: sortKey++,
+          media_category: 'IMAGE' 
+        });
+      }
+
+      // Process Large Photo
+      if (photo.LargePhotoFileName) {
+        mediaObjects.push({
+          url: `https://minio.local/bucket/${photo.LargePhotoFileName}`,
+          media_sort_key: sortKey++,
+          media_category: 'IMAGE'
+        });
+      }
+    }
+
+    return mediaObjects;
   }
 }
