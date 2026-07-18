@@ -83,4 +83,44 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       assert.strictEqual((mediaObj as any).base64_data, undefined); // Strictly enforce no base64
     });
   });
+  describe('Large Photo Media Handling', () => {
+    it('should sequentially sort both thumbnail and large photos into the media array', () => {
+      const transformer = new ZalandoTransformer();
+      const input = [createSyntheticPrismaProduct({
+        ProductProductPhoto: [
+          {
+            ProductPhoto: {
+              ThumbnailPhotoFileName: 'thumb.gif',
+              LargePhotoFileName: 'large.gif'
+            }
+          }
+        ]
+      })];
+      const result = transformer.transformProducts(input);
+      const media = result[0].model.configs[0].media;
+      
+      assert.strictEqual(media.length, 2);
+      assert.strictEqual(media[0].url, 'https://minio.local/bucket/thumb.gif');
+      assert.strictEqual(media[0].media_sort_key, 1);
+      assert.strictEqual(media[1].url, 'https://minio.local/bucket/large.gif');
+      assert.strictEqual(media[1].media_sort_key, 2);
+    });
+  });
+
+  describe('Volume Resilience (Rule 5)', () => {
+    it('should successfully transform 5,000 flat rows without error', () => {
+      const transformer = new ZalandoTransformer();
+      const largeInput = [];
+      for (let i = 0; i < 5000; i++) {
+        largeInput.push(createSyntheticPrismaProduct({
+          ProductID: i,
+          ProductNumber: `VOL-${i}`,
+          ProductModelID: (i % 100) + 1 // Groups into 100 distinct models (1-100)
+        }));
+      }
+      
+      const result = transformer.transformProducts(largeInput);
+      assert.strictEqual(result.length, 100); // 100 distinct models
+    });
+  });
 });

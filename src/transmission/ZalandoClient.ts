@@ -1,35 +1,46 @@
-import axios from 'axios';
-import axiosRetry from 'axios-retry';
-import { ZALANDO_API } from '../config/api';
 import { AuthManager } from './AuthManager';
 
-export const ZalandoClient = axios.create({
-  baseURL: `${ZALANDO_API.BASE_URL}${ZALANDO_API.ENDPOINTS.ARTICLES}`
-});
+export class ZalandoClient {
+  private readonly apiUrl: string;
 
-// Implement axios-retry logic for 429s and 5xx errors with exponential backoff
-axiosRetry(ZalandoClient, {
-  retries: 3,
-  retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) => {
-    if (error.response && error.response.status === 429) {
-      return true;
-    }
-    if (error.response && error.response.status >= 500 && error.response.status < 600) {
-      return true;
-    }
-    return axiosRetry.isNetworkOrIdempotentRequestError(error);
+  constructor() {
+    // Falls back to Zalando Sandbox environment if not explicitly configured
+    this.apiUrl = process.env.ZALANDO_API_URL || 'https://api-sandbox.merchants.zalando.com';
   }
-});
 
-// Automatically append Bearer token to all requests
-ZalandoClient.interceptors.request.use(async (config) => {
-  const token = await AuthManager.getToken();
-  if (!config.headers) {
-    config.headers = {} as any;
+  /**
+   * Transmits the 1:N hierarchical ArticlePayload array to the Zalando ingestion endpoint.
+   */
+  public async submitProducts(payload: any[]): Promise<void> {
+    if (!payload || payload.length === 0) {
+      console.log('[ZalandoClient] No payload provided for transmission. Aborting.');
+      return;
+    }
+
+    try {
+      const token = await AuthManager.getToken();
+
+      console.log(`[ZalandoClient] Transmitting ${payload.length} hierarchical models to ${this.apiUrl}/products...`);
+
+      const response = await fetch(`${this.apiUrl}/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ items: payload }) // Wraps payload per standard Zally bulk ingestion specs
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      console.log('[ZalandoClient] Transmission successful.');
+
+    } catch (error) {
+      console.error('[ZalandoClient] Payload transmission failed:', error);
+      throw error; // Rethrow to allow the caller (ProductsRouter) to format the 500 response
+    }
   }
-  config.headers['Authorization'] = `Bearer ${token}`;
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+}

@@ -2,11 +2,13 @@ import { Router, Request, Response } from 'express';
 import { AdventureWorksRepository } from '../database/AdventureWorksRepository';
 import { ZalandoTransformer } from './ZalandoTransformer';
 import { MinioService } from '../services/MinioService';
+import { ZalandoClient } from './ZalandoClient';
 
 const router = Router();
 const repository = new AdventureWorksRepository();
 const transformer = new ZalandoTransformer();
 const minioService = new MinioService();
+const zalandoClient = new ZalandoClient();
 
 // Initialize bucket on startup
 minioService.ensureBucket().catch(console.error);
@@ -43,12 +45,16 @@ router.get('/export', async (req: Request, res: Response) => {
     // 2. Map and group into the Zally-validated ArticlePayload schema
     const payload = transformer.transformProducts(rawProducts);
 
-    // 3. Transmit the standard JSON payload
+    // 3. Transmit the standard JSON payload across the network
+    await zalandoClient.submitProducts(payload);
+
+    // 4. Return success to the client
     res.status(200).json({
       meta: {
         total_models: payload.length,
         source_rows: rawProducts.length,
-        media_uploaded: uploadedFiles.size
+        media_uploaded: uploadedFiles.size,
+        transmission_status: 'SUCCESS'
       },
       data: payload
     });
