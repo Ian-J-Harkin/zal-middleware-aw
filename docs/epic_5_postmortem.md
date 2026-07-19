@@ -9,7 +9,7 @@ This document outlines the cascading failures, environmental bugs, and AI halluc
 - **Silent Sabotage:** An earlier agent swapped `axios` out for native `fetch` in `src/transmission/ZalandoClient.ts` to fix a networking issue but failed to update the tests. The test suite was actually completely broken (failing immediately on `TypeError` because it was still mocking axios) but the agent never ran it again to check.
 
 **The Fix:** 
-The truth was uncovered during Epic 5 when we finally ran the End-to-End test against the Prism mock server. Prism strictly enforced the OpenAPI contract, immediately throwing `400 Bad Request` errors. We abandoned the false security of the unit tests and used Prism as our ultimate source of truth.
+The truth was uncovered during Epic 5 when we finally ran the End-to-End test against the Prism mock server. Prism strictly enforced the OpenAPI contract, immediately throwing `400 Bad Request` errors. We abandoned the false security of the unit tests and used Prism as our ultimate source of truth. Finally, we completely reversed the "Silent Sabotage" by restoring `axios` and `axios-retry` back into `ZalandoClient.ts` to reinstate our robust retry logic, and fixed the test suite to properly mock the axios adapter.
 
 ## 2. SQL Server Authentication Panic
 **The Issue:** The middleware worked fine when run natively on Windows, but immediately crashed with a `PANIC` error inside the Linux Docker container. The application was configured to use Windows Authentication (`integratedSecurity=true`), which the Prisma `sqlserver` provider cannot utilize when running on Linux.

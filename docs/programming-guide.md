@@ -84,7 +84,7 @@ zal-middleware-aw/
 
 * **`src/transmission/ZalandoClient.ts`**
   * **What it is:** The final network messenger.
-  * **What it does:** It takes the finalized JSON payload, requests a secure token from `AuthManager`, and physically executes the `POST` request to Zalando's ingestion API.
+  * **What it does:** It takes the finalized JSON payload, requests a secure token from `AuthManager`, and physically executes the `POST` request to Zalando's ingestion API. It utilizes `axios` and `axios-retry` to provide extreme resilience, automatically backing off and retrying if Zalando throws a `429 Too Many Requests` or `5xx` error.
 
 * **`src/transmission/ProductsRouter.ts`**
   * **What it is:** The Conductor.
