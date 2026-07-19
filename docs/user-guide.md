@@ -26,7 +26,7 @@ Ensure you have a `.env` file located in the root directory. The application enf
 PRISM_URL=http://127.0.0.1:4010
 CLIENT_ID=mock_client_id
 CLIENT_SECRET=mock_client_secret
-DATABASE_URL="sqlserver://localhost\INSTANCE_NAME;database=AdventureWorks2022;integratedSecurity=true;trustServerCertificate=true;"
+DATABASE_URL="sqlserver://host.docker.internal\INSTANCE_NAME;database=AdventureWorks2022;integratedSecurity=true;trustServerCertificate=true;"
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_USE_SSL=false
