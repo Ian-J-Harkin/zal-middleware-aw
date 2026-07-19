@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "4020:3000"
     environment:
       - PORT=3000
       - NODE_ENV=production
@@ -23,9 +23,12 @@ services:
       # API Configurations
       - CLIENT_ID=${CLIENT_ID}
       - CLIENT_SECRET=${CLIENT_SECRET}
-      - ZALANDO_API_URL=${ZALANDO_API_URL}
+      - PRISM_URL=${PRISM_URL}
+      - ZALANDO_API_URL=${PRISM_URL}
     depends_on:
       - minio
+    extra_hosts:
+      - "MSI:host-gateway"
     networks:
       - zalando-net
 

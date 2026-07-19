@@ -36,6 +36,7 @@ export class ZalandoTransformer {
         currentModel.configsMap.set(color, {
           config_sku: `CONFIG-${modelId}-${color}`,
           color_code: this.ZALANDO_COLOR_CODES[color] || '999', // Fallback code
+          supplier_color: color,
           media: this.transformMedia(product.ProductProductPhoto),
           simples: []
         });
@@ -46,6 +47,7 @@ export class ZalandoTransformer {
       // 3. Push the specific Size variant as a Simple
       currentConfig.simples.push({
         simple_sku: product.ProductNumber,
+        size_grid_id: "US",
         size_code: product.Size || 'OS' // Fallback for Onesize
       });
     }
@@ -58,10 +60,10 @@ export class ZalandoTransformer {
         configs.push(configData);
       }
       payload.push({
-        model: {
-          model_sku: modelData.model_sku,
-          configs: configs
-        }
+        model_sku: modelData.model_sku,
+        brand_code: "AW-123",
+        silhouette_id: "clothing",
+        configs: configs
       });
     }
 

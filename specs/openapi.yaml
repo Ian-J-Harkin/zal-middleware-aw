@@ -116,10 +116,12 @@ components:
     ArticlePayload:
       type: object
       required:
-        - model
+        - items
       properties:
-        model:
-          $ref: '#/components/schemas/ArticleModel'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleModel'
 
     ArticleModel:
       type: object

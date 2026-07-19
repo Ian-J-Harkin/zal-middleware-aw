@@ -20,9 +20,9 @@ export class ZalandoClient {
     try {
       const token = await AuthManager.getToken();
 
-      console.log(`[ZalandoClient] Transmitting ${payload.length} hierarchical models to ${this.apiUrl}/products...`);
+      console.log(`[ZalandoClient] Transmitting ${payload.length} hierarchical models to ${this.apiUrl}/articles...`);
 
-      const response = await fetch(`${this.apiUrl}/products`, {
+      const response = await fetch(`${this.apiUrl}/articles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

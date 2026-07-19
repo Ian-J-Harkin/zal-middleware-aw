@@ -42,7 +42,7 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       // Assert 2 flat inputs become 1 hierarchical output
       assert.strictEqual(result.length, 1);
       
-      const articleModel = result[0].model;
+      const articleModel = result[0];
       assert.strictEqual(articleModel.model_sku, 'MODEL-50');
       
       // Assert 1 color variant = 1 Config
@@ -65,7 +65,7 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       const result = transformer.transformProducts(input);
       
       // Assuming 'Black' maps to '001' in our dictionary
-      assert.strictEqual(result[0].model.configs[0].color_code, '001');
+      assert.strictEqual(result[0].configs[0].color_code, '001');
     });
   });
 
@@ -75,7 +75,7 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       const input = [createSyntheticPrismaProduct()];
       const result = transformer.transformProducts(input);
       
-      const mediaObj = result[0].model.configs[0].media[0];
+      const mediaObj = result[0].configs[0].media[0];
       
       assert.strictEqual(mediaObj.url, 'https://minio.local/bucket/synthetic_thumb.gif');
       assert.strictEqual(mediaObj.media_sort_key, 1);
@@ -99,7 +99,7 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       ];
       const result = transformer.transformProducts(input);
       
-      const mediaArray = result[0].model.configs[0].media;
+      const mediaArray = result[0].configs[0].media;
       
       assert.strictEqual(mediaArray.length, 2);
       assert.strictEqual(mediaArray[0].url, 'https://minio.local/bucket/synthetic_thumb.gif');
@@ -126,8 +126,8 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       const result = transformer.transformProducts(massiveInput);
 
       assert.strictEqual(result.length, 1000);
-      assert.strictEqual(result[999].model.model_sku, 'MODEL-999');
-      assert.strictEqual(result[999].model.configs[0].simples.length, 5);
+      assert.strictEqual(result[999].model_sku, 'MODEL-999');
+      assert.strictEqual(result[999].configs[0].simples.length, 5);
     });
   });
 });
