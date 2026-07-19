@@ -18,7 +18,7 @@ describe('ZalandoClient - Network Transmission Suite', () => {
     });
 
     const client = new ZalandoClient();
-    const syntheticPayload = [{ model: { model_sku: 'TEST-123' } }];
+    const syntheticPayload = [{ model_sku: 'TEST-123' }];
 
     await client.submitProducts(syntheticPayload);
 
@@ -26,7 +26,7 @@ describe('ZalandoClient - Network Transmission Suite', () => {
     assert.strictEqual(mockFetch.mock.calls.length, 1);
     
     const fetchArgs = mockFetch.mock.calls[0].arguments;
-    assert.ok(fetchArgs[0].includes('/products'));
+    assert.ok(fetchArgs[0].includes('/articles'));
     
     const requestOptions = fetchArgs[1];
     assert.strictEqual(requestOptions.method, 'POST');
@@ -34,7 +34,7 @@ describe('ZalandoClient - Network Transmission Suite', () => {
     
     const body = JSON.parse(requestOptions.body);
     assert.strictEqual(body.items.length, 1);
-    assert.strictEqual(body.items[0].model.model_sku, 'TEST-123');
+    assert.strictEqual(body.items[0].model_sku, 'TEST-123');
 
     // Cleanup mocks
     mock.restoreAll();
@@ -55,7 +55,7 @@ describe('ZalandoClient - Network Transmission Suite', () => {
     const client = new ZalandoClient();
     
     await assert.rejects(
-      async () => await client.submitProducts([{ model: { model_sku: 'BAD-DATA' } }]),
+      async () => await client.submitProducts([{ model_sku: 'BAD-DATA' }]),
       (err: Error) => {
         assert.ok(err.message.includes('HTTP 400 Bad Request'));
         assert.ok(err.message.includes('Schema validation failed'));

@@ -103,6 +103,7 @@ zal-middleware-aw/
 * **`test/general/`**
   * **What it is:** Unit tests running on synthetic (fake) data.
   * **What it does:** Proves the underlying math works. It ensures the transformer groups data correctly, maps sequential photo IDs, evaluates falsy logic safely, and handles high-volume loads (5,000 records) without crashing.
+  * **Epic 5 Schema Compliance:** Crucially, this suite also asserts that every generated payload explicitly contains all required `openapi.yaml` fields (`brand_code`, `supplier_color`, etc.) and refuses nested wrappers.
 
 * **`test/snapshots/`**
   * **What it is:** Integration tests running on physical legacy data.

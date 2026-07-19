@@ -16,8 +16,9 @@ The pipeline relies on a local Docker stack to mock Zalando's infrastructure:
 2. **Zalando Zally**: Mathematically verifies that our API schemas do not violate Zalando routing or property-naming rules.
 
 To boot the infrastructure:
+To boot the infrastructure:
 ```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
 
 ### Environment Configuration
@@ -26,15 +27,21 @@ Ensure you have a `.env` file located in the root directory. The application enf
 PRISM_URL=http://127.0.0.1:4010
 CLIENT_ID=mock_client_id
 CLIENT_SECRET=mock_client_secret
-DATABASE_URL="sqlserver://host.docker.internal\INSTANCE_NAME;database=AdventureWorks2022;integratedSecurity=true;trustServerCertificate=true;"
+DATABASE_URL="sqlserver://host.docker.internal\INSTANCE_NAME;database=AdventureWorks2022;user=sa;password=YourStrongPassword;trustServerCertificate=true;"
 MINIO_ENDPOINT=localhost
 MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=zalando-media
-ZALANDO_API_URL=https://api-sandbox.merchants.zalando.com
+ZALANDO_API_URL=http://host.docker.internal:4010
 ```
+
+> [!WARNING]
+> The `DATABASE_URL` must use standard SQL Authentication (e.g., `user=sa;password=...`). Windows Authentication (`integratedSecurity=true`) will cause Prisma to crash inside the Linux Docker container. Ensure your SQL Server has Mixed Mode Authentication enabled.
+
+> [!NOTE]
+> The Zalando Middleware container maps its internal port 3000 to host port 4020 (`4020:3000`) to prevent conflicts with other local development servers. Use `http://localhost:4020` when interacting with the API locally.
 
 ---
 

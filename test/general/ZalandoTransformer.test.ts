@@ -130,4 +130,36 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
       assert.strictEqual(result[999].configs[0].simples.length, 5);
     });
   });
+
+  describe('Strict OpenAPI Schema Compliance (Epic 5 Regression Prevention)', () => {
+    it('should explicitly include all required schema fields (brand_code, silhouette_id, etc.) without wrapper', () => {
+      const transformer = new ZalandoTransformer();
+      const input = [createSyntheticPrismaProduct()];
+      const result = transformer.transformProducts(input);
+      
+      const articleModel = result[0];
+      
+      // Ensure the model wrapper is gone
+      assert.strictEqual((articleModel as any).model, undefined, 'Payload must be flat, no nested model wrapper allowed');
+      
+      // Assert required Model fields
+      assert.ok(articleModel.model_sku, 'Missing model_sku');
+      assert.strictEqual(articleModel.brand_code, 'AW-123', 'Missing required brand_code');
+      assert.strictEqual(articleModel.silhouette_id, 'clothing', 'Missing required silhouette_id');
+      assert.ok(Array.isArray(articleModel.configs), 'Missing configs array');
+      
+      // Assert required Config fields
+      const config = articleModel.configs[0];
+      assert.ok(config.config_sku, 'Missing config_sku');
+      assert.ok(config.color_code, 'Missing color_code');
+      assert.ok(config.supplier_color, 'Missing supplier_color');
+      assert.ok(Array.isArray(config.simples), 'Missing simples array');
+      
+      // Assert required Simple fields
+      const simple = config.simples[0];
+      assert.ok(simple.simple_sku, 'Missing simple_sku');
+      assert.strictEqual(simple.size_grid_id, 'US', 'Missing required size_grid_id');
+      assert.ok(simple.size_code, 'Missing size_code');
+    });
+  });
 });
