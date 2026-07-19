@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "build": "tsc",
     "test": "node --test --import tsx test/*.test.ts",
     "test:general": "node --import tsx --test test/general/*.test.ts",
     "test:snapshots": "node --import tsx --test test/snapshots/*.test.ts",

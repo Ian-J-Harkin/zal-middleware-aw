@@ -1,30 +1,52 @@
 version: '3.8'
+
 services:
-  prism:
-    image: stoplight/prism:5
-    command: mock -m false -h 0.0.0.0 -p 4010 /specs/openapi.yaml
-    volumes:
-      - ./specs:/specs
+  # The Epic 4 Node.js Middleware
+  zalando-middleware:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "4010:4010"
-
-  zally-db:
-    image: postgres:15-alpine
+      - "3000:3000"
     environment:
-      POSTGRES_DB: zally
-      POSTGRES_USER: zally
-      POSTGRES_PASSWORD: zally_password
-    ports:
-      - "5432:5432"
-
-  zally:
-    image: zally-server:latest
-    ports:
-      - "8000:8000"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:postgresql://zally-db:5432/zally
-      SPRING_DATASOURCE_USERNAME: zally
-      SPRING_DATASOURCE_PASSWORD: zally_password
+      - PORT=3000
+      - NODE_ENV=production
+      # Internal Docker network routing to MinIO
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_USE_SSL=false
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=zalando-media
+      # Ensure this points to your local SQL Server instance or a secure remote IP
+      - DATABASE_URL=${DATABASE_URL}
+      # API Configurations
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - ZALANDO_API_URL=${ZALANDO_API_URL}
     depends_on:
-      - zally-db
+      - minio
+    networks:
+      - zalando-net
+
+  # The Epic 4 Media Storage CDN
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001" # MinIO Console UI
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - zalando-net
+
+networks:
+  zalando-net:
+    driver: bridge
+
+volumes:
+  minio_data:
