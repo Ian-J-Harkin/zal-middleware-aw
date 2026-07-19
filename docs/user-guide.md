@@ -26,13 +26,21 @@ Ensure you have a `.env` file located in the root directory. The application enf
 PRISM_URL=http://127.0.0.1:4010
 CLIENT_ID=mock_client_id
 CLIENT_SECRET=mock_client_secret
+DATABASE_URL="sqlserver://localhost\INSTANCE_NAME;database=AdventureWorks2022;integratedSecurity=true;trustServerCertificate=true;"
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=zalando-media
+ZALANDO_API_URL=https://api-sandbox.merchants.zalando.com
 ```
 
 ---
 
 ## 2. System Architecture
 
-The project is being constructed across a 5-Epic roadmap. Currently, the foundational layers are active:
+The project is being constructed across a 5-Epic roadmap. Currently, Epics 1 through 4 are complete:
 
 ### Epic 1: Contract Baseline
 The API contract (`specs/openapi.yaml`) defines exactly how our AdventureWorks products are modeled (via `ArticleModel` and `ArticleConfig`). 
@@ -40,14 +48,22 @@ The API contract (`specs/openapi.yaml`) defines exactly how our AdventureWorks p
 
 ### Epic 2: The Transmission Core
 All outbound HTTP traffic routes through a centralized configuration to prevent "magic string" bugs.
-- **AuthManager**: Operates the OAuth2 Client Credentials flow, targeting the `/tokens` endpoint for the `article.write` scope. Includes a 60-second preemptive token refresh cache.
-- **ZalandoClient**: A dedicated Axios instance armed with exponential backoff retries to automatically navigate `429 Too Many Requests` or `5xx Server Errors`.
+- **AuthManager**: Operates the OAuth2 Client Credentials flow, targeting the `/tokens` endpoint for the `article.write` scope.
+- **ZalandoClient**: A dedicated API transmission client to securely wrap and push payloads to the Zalando network boundary.
 - **Validation**: Run `npx tsx src/scripts/test-auth.ts` to test the runtime integration against the Prism mock server.
 
-### Epic 3: Database Extraction (Upcoming)
-*(This architecture is currently under development)*
-The upcoming Epic 3 will establish the extraction layer connecting directly to the Microsoft AdventureWorks SQL instance.
-- Expected behavior includes pulling live SQL rows, cleaning them against our data dictionary, and feeding them into the strict `ArticleModel` payloads. Items that lack critical Zalando attributes will be directed to a Dead Letter Queue to prevent pipeline pollution.
+### Epic 3: Database Extraction
+Establishes the extraction layer connecting directly to the Microsoft AdventureWorks SQL instance via Prisma ORM.
+- Pulls live SQL rows (`getSellableProducts()`), cleaning them against our data dictionary and trimming extraneous spaces. Filters strictly to return only valid, sellable items (products mapped to a Model, possessing photos), dropping non-retail infrastructure parts.
+
+### Epic 4: Data Transformation and MinIO Integration
+Transforms the flat SQL relational data into the highly structured 1:N `Model -> Config -> Simple` object hierarchy required by Zalando.
+- **MinIO Object Storage**: Uploads both thumbnail and large Product photos dynamically to a MinIO bucket and replaces binary buffers with secure CDN URLs.
+- **Zalando Transformer**: Maps colors and sizes, sequentially sorting media, strictly adhering to the `openapi.yaml` schema.
+- **Orchestration**: Express router (`ProductsRouter`) that extracts rows, triggers MinIO uploads, executes the transformation, and transmits the payload directly via the `ZalandoClient`.
+- **Validation**:
+  - `npm run test:general`: Volume-resilient mathematical unit test suite ensuring large payloads group efficiently.
+  - `npm run test:snapshots`: Point-in-time physical data tests against known legacy records to ensure zero regression drift.
 
 ---
 
