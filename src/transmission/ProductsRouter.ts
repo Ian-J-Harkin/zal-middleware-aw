@@ -45,18 +45,17 @@ router.get('/export', async (req: Request, res: Response) => {
     // 2. Map and group into the Zally-validated ArticlePayload schema
     const payload = transformer.transformProducts(rawProducts);
 
-    // 3. Transmit the standard JSON payload across the network
+    // 3. Transmit to Zalando
     await zalandoClient.submitProducts(payload);
 
-    // 4. Return success to the client
+    // 4. Return success to the trigger
     res.status(200).json({
       meta: {
+        status: 'Transmitted',
         total_models: payload.length,
         source_rows: rawProducts.length,
-        media_uploaded: uploadedFiles.size,
-        transmission_status: 'SUCCESS'
-      },
-      data: payload
+        media_uploaded: uploadedFiles.size
+      }
     });
   } catch (error) {
     console.error('[ProductsRouter] Export failed:', error);

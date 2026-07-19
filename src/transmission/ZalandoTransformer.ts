@@ -16,7 +16,7 @@ export class ZalandoTransformer {
     const modelsMap = new Map<number, any>();
 
     for (const product of products) {
-      if (!product.ProductModelID) continue; // Safety check per Rule 2 (Singleton handling logic can be expanded here)
+      if (product.ProductModelID == null) continue; // Safety check per Rule 2 (Singleton handling logic can be expanded here)
 
       const modelId = product.ProductModelID;
       const color = product.Color || 'UNKNOWN';

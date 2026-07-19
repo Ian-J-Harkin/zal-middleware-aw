@@ -84,43 +84,50 @@ describe('ZalandoTransformer - General Volume-Agnostic Suite', () => {
     });
   });
   describe('Large Photo Media Handling', () => {
-    it('should sequentially sort both thumbnail and large photos into the media array', () => {
+    it('should extract both Thumbnail and Large photos with sequential sort keys', () => {
       const transformer = new ZalandoTransformer();
-      const input = [createSyntheticPrismaProduct({
-        ProductProductPhoto: [
-          {
+      const input = [
+        createSyntheticPrismaProduct({
+          ProductProductPhoto: [{
+            Primary: true,
             ProductPhoto: {
-              ThumbnailPhotoFileName: 'thumb.gif',
-              LargePhotoFileName: 'large.gif'
+              ThumbnailPhotoFileName: 'synthetic_thumb.gif',
+              LargePhotoFileName: 'synthetic_large.gif'
             }
-          }
-        ]
-      })];
+          }]
+        })
+      ];
       const result = transformer.transformProducts(input);
-      const media = result[0].model.configs[0].media;
       
-      assert.strictEqual(media.length, 2);
-      assert.strictEqual(media[0].url, 'https://minio.local/bucket/thumb.gif');
-      assert.strictEqual(media[0].media_sort_key, 1);
-      assert.strictEqual(media[1].url, 'https://minio.local/bucket/large.gif');
-      assert.strictEqual(media[1].media_sort_key, 2);
+      const mediaArray = result[0].model.configs[0].media;
+      
+      assert.strictEqual(mediaArray.length, 2);
+      assert.strictEqual(mediaArray[0].url, 'https://minio.local/bucket/synthetic_thumb.gif');
+      assert.strictEqual(mediaArray[0].media_sort_key, 1);
+      assert.strictEqual(mediaArray[1].url, 'https://minio.local/bucket/synthetic_large.gif');
+      assert.strictEqual(mediaArray[1].media_sort_key, 2);
     });
   });
 
   describe('Volume Resilience (Rule 5)', () => {
-    it('should successfully transform 5,000 flat rows without error', () => {
+    it('should process 5,000 synthetic records efficiently without dropping data', () => {
       const transformer = new ZalandoTransformer();
-      const largeInput = [];
-      for (let i = 0; i < 5000; i++) {
-        largeInput.push(createSyntheticPrismaProduct({
-          ProductID: i,
-          ProductNumber: `VOL-${i}`,
-          ProductModelID: (i % 100) + 1 // Groups into 100 distinct models (1-100)
-        }));
-      }
       
-      const result = transformer.transformProducts(largeInput);
-      assert.strictEqual(result.length, 100); // 100 distinct models
+      const massiveInput = Array.from({ length: 5000 }, (_, i) => {
+        const modelId = Math.floor(i / 5); 
+        return createSyntheticPrismaProduct({ 
+          ProductID: i, 
+          ProductNumber: `STP-${i}`,
+          ProductModelID: modelId,
+          Size: `SIZE-${i % 5}`
+        });
+      });
+      
+      const result = transformer.transformProducts(massiveInput);
+
+      assert.strictEqual(result.length, 1000);
+      assert.strictEqual(result[999].model.model_sku, 'MODEL-999');
+      assert.strictEqual(result[999].model.configs[0].simples.length, 5);
     });
   });
 });
